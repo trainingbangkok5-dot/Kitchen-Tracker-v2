@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703150000">
+<meta name="app-version" content="20260703200000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -8916,7 +8916,13 @@ function toggleEditMode(s) {
     // Count real http photos only — don't render them again (already shown in task row)
     const httpPhotos = existingPhotos.filter(u => u && u.startsWith('http'));
     const photoCountLabel = httpPhotos.length > 0 ? `✓ ${httpPhotos.length} staff photo(s)` : (existingPhotos.length > 0 ? '📷 Photo taken' : '');
-    const staffPhotoHtml = httpPhotos.map(u=>`<img src="${u}" style="max-width:70px;max-height:55px;border-radius:6px;border:2px solid #22C55E;cursor:zoom-in;margin-right:4px;" onclick="openLightbox('${u}')" title="Tap to zoom">`).join('');
+    // ── Fix (2026-07-03): this section is for the VERIFIER's own photo, not
+    // a copy of the staff's. It was previously pre-filled with staffPhotoHtml,
+    // duplicating the staff's photos into what should be a separate,
+    // independent verification photo slot — causing the exact "photos
+    // getting duplicated into the OIC photo section" issue reported.
+    const _existingOicPhoto = (task && task.oicPhotoUrl && task.oicPhotoUrl.startsWith('http')) ? task.oicPhotoUrl : '';
+    const staffPhotoHtml = _existingOicPhoto ? `<img src="${_existingOicPhoto}" style="max-width:70px;max-height:55px;border-radius:6px;border:2px solid #22C55E;cursor:zoom-in;margin-right:4px;" onclick="openLightbox('${_existingOicPhoto}')" title="Tap to zoom">` : '';
     const extraDiv = document.createElement('div');
     extraDiv.className = 'edit-extra-fields';
     extraDiv.style.cssText = 'flex-basis:100%;padding:10px;background:#F8FAFC;border-radius:0 0 8px 8px;border-top:1px solid #E0DDD4;';
