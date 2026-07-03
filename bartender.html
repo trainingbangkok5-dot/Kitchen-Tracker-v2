@@ -3,7 +3,7 @@
 <head>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703170000">
+<meta name="app-version" content="20260703180000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -505,9 +505,7 @@ function _setupFileInput(id, withCapture, taskId) {
   input.addEventListener('change', function(e) {
     const file = e.target.files && e.target.files[0];
     if (file) {
-      // Use taskId from closure — never rely on global activePhotoTask at fire time
-      if (taskId) activePhotoTask = taskId;
-      handlePhotoFile(file);
+      handlePhotoFile(file, taskId);
       setTimeout(() => { try { input.value = ''; } catch(e2) {} }, 600);
     }
   });
@@ -612,9 +610,10 @@ async function _updateSubmittedPhoto(taskId, photoKey, photoUrl) {
   } catch(e) { console.warn('_updateSubmittedPhoto failed:', e); }
 }
 
-async function handlePhotoFile(file) {
-  if(!file||!activePhotoTask) return;
-  const tid=activePhotoTask; activePhotoTask=null;
+async function handlePhotoFile(file, explicitTaskId) {
+  if(!file) return;
+  // Fix (2026-07-03): prefer explicit taskId over the shared global.
+  const tid=explicitTaskId||activePhotoTask; if(!tid) return; activePhotoTask=null;
   const reader=new FileReader();
   reader.onload=async e=>{
     const dataUrl=e.target.result;

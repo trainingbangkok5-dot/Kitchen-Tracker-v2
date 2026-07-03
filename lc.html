@@ -3,7 +3,7 @@
 <head>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703170000">
+<meta name="app-version" content="20260703180000">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Line Cook Checklist">
@@ -779,8 +779,7 @@ function _setupFileInput(id, withCapture, taskId) {
   input.addEventListener('change', function(e) {
     const file = (e.target.files && e.target.files.length > 0) ? e.target.files[0] : null;
     if (file) {
-      if (taskId) activePhotoTask = taskId;
-      handlePhotoFile(file);
+      handlePhotoFile(file, taskId);
       setTimeout(() => { try { input.value = ''; } catch(e2) {} }, 600);
     }
   });
@@ -1936,9 +1935,12 @@ function closePhotoModal() {
 
 
 
-function handlePhotoFile(file) {
-  if (!file || !activePhotoTask) return;
-  const taskId = activePhotoTask;
+function handlePhotoFile(file, explicitTaskId) {
+  if (!file) return;
+  // Fix (2026-07-03): prefer explicit taskId over the shared global —
+  // see kic2.html for full explanation of the race this closes.
+  const taskId = explicitTaskId || activePhotoTask;
+  if (!taskId) return;
   activePhotoTask = null;
   closePhotoModal();
   compressAndReturn(file, async function(dataUrl) {

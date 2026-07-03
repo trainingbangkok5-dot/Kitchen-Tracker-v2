@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703170000">
+<meta name="app-version" content="20260703180000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="20260615280000">
@@ -658,8 +658,7 @@ function _setupFileInput(id, withCapture, taskId) {
   input.addEventListener('change', function(e) {
     const file = e.target.files && e.target.files[0];
     if (file) {
-      if (taskId) activePhotoTask = taskId;
-      handlePhotoFile(file);
+      handlePhotoFile(file, taskId);
       setTimeout(function(){ try { input.value=''; } catch(e2){} }, 600);
     }
   });
@@ -1753,9 +1752,12 @@ async function _updateSubmittedPhoto(taskId, photoKey, photoUrl) {
   } catch(e) { console.warn('_updateSubmittedPhoto failed:', e); }
 }
 
-function handlePhotoFile(file) {
-  if (!file || !activePhotoTask) return;
-  const taskId = activePhotoTask;
+function handlePhotoFile(file, explicitTaskId) {
+  if (!file) return;
+  // ── Fix (2026-07-03): prefer explicit taskId over the shared global —
+  // see kic2.html for full explanation of the race this closes.
+  const taskId = explicitTaskId || activePhotoTask;
+  if (!taskId) return;
   activePhotoTask = null;
   closePhotoModal(); // ← auto-close modal immediately after photo selected
   compressAndReturn(file, async function(dataUrl) {
