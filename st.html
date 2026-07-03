@@ -3,7 +3,7 @@
 <head>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
-<meta name="app-version" content="20260702200000">
+<meta name="app-version" content="20260703170000">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Steward Checklist">
@@ -103,14 +103,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helv
 .ot-record { background:#EDE9FE; color:#5B21B6; }
 .ot-auditor { background:#FCE7F3; color:#9D174D; }
 .task-text { font-size:13px; font-weight:500; line-height:1.4; flex:1; }
-.yn-row { display:flex; gap:6px; }
-.yn { flex:1; padding:9px 4px; border-radius:8px; border:1.5px solid #E2E8F0; background:#F8FAFC; font-size:12px; font-weight:700; color:#64748B; text-align:center; cursor:pointer; -webkit-appearance:none; transition:all 0.12s; }
+.yn-row { display:flex; gap:6px; flex-wrap:wrap; }
+.yn { flex:1 1 70px; min-width:70px; padding:9px 4px; border-radius:8px; border:1.5px solid #E2E8F0; background:#F8FAFC; font-size:12px; font-weight:700; color:#64748B; text-align:center; cursor:pointer; -webkit-appearance:none; transition:all 0.12s; }
 .yn:active { transform:scale(0.96); }
 .yn.yes.on { background:#DCFCE7; border-color:#22C55E; color:#15803D; }
 .yn.no.on  { background:#FEE2E2; border-color:#EF4444; color:#B91C1C; }
 .yn.na.on  { background:#F3F4F6; border-color:#9CA3AF; color:#374151; }
 .photo-row { margin-top:9px; display:flex; align-items:center; gap:8px; }
-.photo-btn { display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1.5px dashed #CBD5E1; border-radius:9px; padding:8px 12px; cursor:pointer; font-size:12px; font-weight:600; color:#64748B; -webkit-appearance:none; transition:all 0.15s; }
+.photo-btn { display:flex; align-items:center; justify-content:center; gap:6px; background:#F8FAFC; border:1.5px dashed #CBD5E1; border-radius:9px; padding:8px 12px; cursor:pointer; font-size:12px; font-weight:600; color:#64748B; -webkit-appearance:none; transition:all 0.15s; flex-basis:100%; margin-top:6px; }
 .photo-btn.taken { border-style:solid; border-color:#22C55E; color:#15803D; background:#F0FDF4; }
 .photo-btn:active { transform:scale(0.97); }
 .photo-thumb { width:44px; height:44px; border-radius:8px; object-fit:cover; border:2px solid #22C55E; flex-shrink:0; }

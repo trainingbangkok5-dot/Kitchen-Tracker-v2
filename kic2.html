@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260702200000">
+<meta name="app-version" content="20260703170000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="20260615290000">
@@ -105,14 +105,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helv
 .ot-record { background:#EDE9FE; color:#5B21B6; }
 .ot-auditor { background:#FCE7F3; color:#9D174D; }
 .task-text { font-size:13px; font-weight:500; line-height:1.4; flex:1; }
-.yn-row { display:flex; gap:6px; }
-.yn { flex:1; padding:9px 4px; border-radius:8px; border:1.5px solid #E2E8F0; background:#F8FAFC; font-size:12px; font-weight:700; color:#64748B; text-align:center; cursor:pointer; -webkit-appearance:none; transition:all 0.12s; }
+.yn-row { display:flex; gap:6px; flex-wrap:wrap; }
+.yn { flex:1 1 70px; min-width:70px; padding:9px 4px; border-radius:8px; border:1.5px solid #E2E8F0; background:#F8FAFC; font-size:12px; font-weight:700; color:#64748B; text-align:center; cursor:pointer; -webkit-appearance:none; transition:all 0.12s; }
 .yn:active { transform:scale(0.96); }
 .yn.yes.on { background:#DCFCE7; border-color:#22C55E; color:#15803D; }
 .yn.no.on  { background:#FEE2E2; border-color:#EF4444; color:#B91C1C; }
 .yn.na.on  { background:#F3F4F6; border-color:#9CA3AF; color:#374151; }
 .photo-row { margin-top:9px; display:flex; align-items:center; gap:8px; }
-.photo-btn { display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1.5px dashed #CBD5E1; border-radius:9px; padding:8px 12px; cursor:pointer; font-size:12px; font-weight:600; color:#64748B; -webkit-appearance:none; transition:all 0.15s; }
+.photo-btn { display:flex; align-items:center; justify-content:center; gap:6px; background:#F8FAFC; border:1.5px dashed #CBD5E1; border-radius:9px; padding:8px 12px; cursor:pointer; font-size:12px; font-weight:600; color:#64748B; -webkit-appearance:none; transition:all 0.15s; flex-basis:100%; margin-top:6px; }
 .photo-btn.taken { border-style:solid; border-color:#22C55E; color:#15803D; background:#F0FDF4; }
 .photo-btn:active { transform:scale(0.97); }
 .photo-thumb { width:44px; height:44px; border-radius:8px; object-fit:cover; border:2px solid #22C55E; flex-shrink:0; }
@@ -933,6 +933,26 @@ let activePhotoTask = null;
 // ── Storage ───────────────────────────────────────────────────
 function load() { try { return JSON.parse(localStorage.getItem(SK))||{}; } catch(e) { return {}; } }
 
+// ── Fix (2026-07-03): safe SK switching — migrates today's data forward ──
+// SK changes on every keystroke while typing the name field. Without this,
+// answers saved under an earlier partial-name key become invisible the
+// moment SK shifts again, making a fully-answered checklist look empty at
+// submit time. This copies today's answers into the new key before
+// switching, so nothing is ever orphaned.
+function switchSK(newSK) {
+  if (newSK === SK) return;
+  try {
+    const oldData = JSON.parse(localStorage.getItem(SK)) || {};
+    const newData = JSON.parse(localStorage.getItem(newSK)) || {};
+    const todayKey = getTodayKey();
+    if (oldData[todayKey]) {
+      newData[todayKey] = Object.assign({}, oldData[todayKey], newData[todayKey] || {});
+      localStorage.setItem(newSK, JSON.stringify(newData));
+    }
+  } catch(e) {}
+  SK = newSK;
+}
+
 function _stripBase64(d) {
   try {
     var clean = JSON.parse(JSON.stringify(d));
@@ -1493,7 +1513,7 @@ async function submitDay() {
   if(!_vn.valid){showToast(_vn.msg,'warn');document.getElementById('fName').focus();return;}
   if(!getOutlet()){showToast('Please select an outlet','warn');return;}
   if(!currentShift){showToast('Please select a shift first','warn');return;}
-  SK=SK_BASE+'_'+name.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+  switchSK(SK_BASE+'_'+name.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase());
   const shiftSec=SECTIONS.filter(s=>s.shift===currentShift);
   await waitForPhotoUploads(shiftSec.flatMap(s=>s.tasks), 8000);
   const _tdNow=load()[getTodayKey()]||{};
@@ -1733,7 +1753,7 @@ window.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('input', () => {
       localStorage.setItem('kic_info_' + ROLE + '_' + id, el.value);
       const name = document.getElementById('fName')?.value?.trim();
-      if (name) SK = SK_BASE + '_' + name.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+      if (name) switchSK(SK_BASE + '_' + name.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase());
       buildDayRail(); renderDay();
     });
   });

@@ -3,7 +3,7 @@
 <head>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
-<meta name="app-version" content="20260702200000">
+<meta name="app-version" content="20260703170000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -89,12 +89,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helv
 .ot-self { background:#DBEAFE; color:#1D4ED8; }
 .ot-verify { background:#FFE4E1; color:#9F1239; }
 .task-text { display:block; font-size:13px; font-weight:500; color:#1E293B; line-height:1.4; }
-.yn-row { display:flex; gap:8px; align-items:center; }
-.yn { flex:1; padding:9px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:600; text-align:center; cursor:pointer; background:#F8FAFC; color:#64748B; -webkit-appearance:none; }
+.yn-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.yn { flex:1 1 70px; min-width:70px; padding:9px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:600; text-align:center; cursor:pointer; background:#F8FAFC; color:#64748B; -webkit-appearance:none; }
 .yn.on.yes { background:#DCFCE7; border-color:#22C55E; color:#15803D; }
 .yn.on.no  { background:#FEE2E2; border-color:#EF4444; color:#B91C1C; }
 .yn.on.na  { background:#F1F5F9; border-color:#94A3B8; color:#475569; }
-.photo-btn { padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; background:#F8FAFC; color:#475569; flex-shrink:0; }
+.photo-btn { padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; background:#F8FAFC; color:#475569; flex-basis:100%; margin-top:6px; text-align:center; }
 .photo-btn.taken { border-color:#22C55E; background:#DCFCE7; color:#15803D; }
 .comment-box { width:100%; margin-top:8px; padding:7px 10px; border:1px solid #E2E8F0; border-radius:8px; font-size:12px; resize:none; outline:none; font-family:inherit; background:#F8FAFC; }
 .submit-btn { display:block; width:calc(100% - 32px); margin:16px; padding:14px; background:#1A3C5E; color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; -webkit-appearance:none; }
