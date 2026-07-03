@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260702200000">
+<meta name="app-version" content="20260703090000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10473,7 +10473,7 @@ function deleteVerificationEntry(btn, idx) {
 
 // ── Snapshot current YN counts for a shift — stored on each verification log entry ──
 function _snapYN(taskData, shift, role) {
-  if (!taskData) return { yes: 0, no: 0 };
+  if (!taskData) return { yes: 0, no: 0, na: 0 };
   // Use all answered tasks for the shift — count everything staff answered
   const openIds  = ['o1','o2','o3','o4','o5'];
   const closeIds = role === 'kic' ? ['cy1','cy2','cy3','cy4']
@@ -10485,16 +10485,16 @@ function _snapYN(taskData, shift, role) {
     's1','s2','s3','s4','m1','m2','u1','u2','w1','w2','p1','p2','mp1','mp2','a1',
     'f1','f2','t1','t2','t3','t4','bt1','bt2','bt3','bt4','dc1','dc2','dc3','dc4','dc5'];
   const ids = shift === 'opening' ? openIds : shift === 'closing' ? closeIds : evalIds;
-  let yes = 0, no = 0;
+  let yes = 0, no = 0, na = 0;
   Object.entries(taskData).forEach(function(e) {
     const tid = e[0].replace(/^d[0-9]+_/, '');
     const yn = (e[1]||{}).yn;
-    if (!yn || yn === 'na') return;
+    if (!yn) return;
     if (ids.some(function(id){ return tid === id; })) {
-      if (yn === 'yes') yes++; else no++;
+      if (yn === 'yes') yes++; else if (yn === 'no') no++; else if (yn === 'na') na++;
     }
   });
-  return { yes: yes, no: no };
+  return { yes: yes, no: no, na: na };
 }
 
 
@@ -10653,12 +10653,31 @@ function saveBOHVerification() {
             updateMap2['submissions/' + child.key + '/verifiedByRole'] = currentRole;
             updateMap2['submissions/' + child.key + '/verifiedAt'] = now;
             updateMap2['submissions/' + child.key + '/lastUpdated'] = now;
+            // ── Fix (2026-07-03): verifying Evaluation must also update the
+            // actual score, not just log the sign-off.
+            if (shift === 'evaluation') {
+              if ((_bohYN.yes||0) + (_bohYN.no||0) === 0) {
+                updateMap2['submissions/' + child.key + '/evalNotVisited'] = true;
+                updateMap2['submissions/' + child.key + '/oicEvalPct'] = null;
+              } else {
+                updateMap2['submissions/' + child.key + '/oicEvalPct'] = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
+                updateMap2['submissions/' + child.key + '/evalNotVisited'] = false;
+              }
+            }
           }
         });
         if (Object.keys(updateMap2).length) {
           firebaseRef.ref().update(updateMap2).then(() => {
             s.verificationLog = existingLog;
             s.verifiedBy = name; s.verifiedByRole = currentRole; s.verifiedAt = now;
+            if (shift === 'evaluation') {
+              if ((_bohYN.yes||0) + (_bohYN.no||0) === 0) {
+                s.evalNotVisited = true; s.oicEvalPct = null;
+              } else {
+                s.oicEvalPct = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
+                s.evalNotVisited = false;
+              }
+            }
             showToast('Re-verified: ' + s.staffName, 'ok');
             renderBOHStaff();
           }).catch(e => showToast('Save failed: ' + e.message, 'error'));
@@ -10682,6 +10701,16 @@ function saveBOHVerification() {
         updateMap['submissions/' + child.key + '/verifiedBy'] = name;
         updateMap['submissions/' + child.key + '/verifiedByRole'] = currentRole;
         updateMap['submissions/' + child.key + '/verifiedAt'] = now;
+        // ── Fix (2026-07-03): same as reverify path ──────────────────────
+        if (shift === 'evaluation') {
+          if ((_bohYN.yes||0) + (_bohYN.no||0) === 0) {
+            updateMap['submissions/' + child.key + '/evalNotVisited'] = true;
+            updateMap['submissions/' + child.key + '/oicEvalPct'] = null;
+          } else {
+            updateMap['submissions/' + child.key + '/oicEvalPct'] = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
+            updateMap['submissions/' + child.key + '/evalNotVisited'] = false;
+          }
+        }
         updateMap['submissions/' + child.key + '/lastUpdated'] = now;
       }
     });
@@ -10691,6 +10720,14 @@ function saveBOHVerification() {
       s.verifiedByRole = currentRole;
       s.verifiedAt = now;
       s.verificationLog = existingLog;
+      if (shift === 'evaluation') {
+        if ((_bohYN.yes||0) + (_bohYN.no||0) === 0) {
+          s.evalNotVisited = true; s.oicEvalPct = null;
+        } else {
+          s.oicEvalPct = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
+          s.evalNotVisited = false;
+        }
+      }
       [allStaff, allBOHData, allFOHData].forEach(arr => {
         arr.forEach(r => {
           if (r.staffName === s.staffName && r.role === s.role && r.week === s.week) {
@@ -11481,6 +11518,21 @@ function renderFOHStaff() {
   // Ensure evalNotVisited is carried through from allFOHData into _fohFiltered
   filtered.forEach(r => { if (r.evalNotVisited === undefined) r.evalNotVisited = false; });
   _fohFiltered = filtered;
+  // ── Stale-index fix (2026-07-03) ────────────────────────────────────
+  // If a detail view is currently open and this live-data refresh just
+  // rebuilt the array, re-locate the SAME record by its stable key rather
+  // than trusting the old numeric index — which can now point at a
+  // different record or nothing at all. This is what was causing the
+  // Evaluation section to silently vanish when re-opening a record after
+  // background data changed.
+  if (_fohDetailKey) {
+    const _newIdx = _fohFiltered.findIndex(s => ((s.staffName||'') + '_' + (s.role||'') + '_' + (s.week||'')) === _fohDetailKey);
+    if (_newIdx !== -1) {
+      _fohDetailIdx = _newIdx;
+    } else {
+      _fohDetailIdx = -1; // record no longer in current filter — safer than pointing at the wrong one
+    }
+  }
   filtered.forEach((staff, staffIdx) => {
     const tr = document.createElement('tr');
     tr.style.borderBottom = '0.5px solid #F1F5F9';
@@ -11511,11 +11563,13 @@ function renderFOHStaff() {
 let _bohFiltered = [];
 let _fohFiltered = [];
 let _fohDetailIdx = -1;
+let _fohDetailKey = null; // stable staffName_role_week identifier — survives live-data rebuilds
 
 function openFOHDetail(idx) {
   const staff = _fohFiltered[idx];
   if (!staff) return;
   _fohDetailIdx = idx;
+  _fohDetailKey = (staff.staffName||'') + '_' + (staff.role||'') + '_' + (staff.week||'');
   // Clear BOH staff references so FOH delete/verify use the correct FOH staff
   _currentDetailStaff = null;
   _currentStaffData = null;
@@ -12008,6 +12062,7 @@ function deleteFOHRecord() {
 function closeFOHDetailModal() {
   _fohEditMode = false;
   _fohEditChanges = {};
+  _fohDetailKey = null;
   const btn = document.getElementById('fohEditBtn');
   if (btn) { btn.textContent = '✏️ Edit / Overwrite'; btn.style.background = '#E87722'; }
   document.getElementById('fohDetailModal').style.display = 'none';
@@ -12288,12 +12343,33 @@ function saveFOHMultiVerify() {
             updates2['submissions/' + child.key + '/verifiedByRole'] = currentRole;
             updates2['submissions/' + child.key + '/verifiedAt'] = now;
             updates2['submissions/' + child.key + '/lastUpdated'] = now;
+            // ── Fix (2026-07-03): verifying Evaluation must also update the
+            // actual score, not just log the sign-off. Without this, the
+            // score box stayed stuck on "Pending" even after verification.
+            if (fohShift === 'evaluation') {
+              if ((_fohYN.yes||0) + (_fohYN.no||0) === 0) {
+                updates2['submissions/' + child.key + '/evalNotVisited'] = true;
+                updates2['submissions/' + child.key + '/oicEvalPct'] = null;
+              } else {
+                const _fohEvalPct = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
+                updates2['submissions/' + child.key + '/oicEvalPct'] = _fohEvalPct;
+                updates2['submissions/' + child.key + '/evalNotVisited'] = false;
+              }
+            }
           }
         });
         if (Object.keys(updates2).length) {
           fohDb.ref().update(updates2).then(() => {
             staff.verificationLog = log;
             staff.verifiedBy = name; staff.verifiedByRole = currentRole; staff.verifiedAt = now;
+            if (fohShift === 'evaluation') {
+              if ((_fohYN.yes||0) + (_fohYN.no||0) === 0) {
+                staff.evalNotVisited = true; staff.oicEvalPct = null;
+              } else {
+                staff.oicEvalPct = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
+                staff.evalNotVisited = false;
+              }
+            }
             showToast('Re-verified: ' + staff.staffName, 'ok');
             renderFOHStaff();
           }).catch(e => showToast('Save failed: ' + e.message, 'error'));
@@ -12315,12 +12391,32 @@ function saveFOHMultiVerify() {
         updates['submissions/' + child.key + '/verifiedBy'] = name;
         updates['submissions/' + child.key + '/verifiedByRole'] = currentRole;
         updates['submissions/' + child.key + '/verifiedAt'] = now;
+        // ── Fix (2026-07-03): same as reverify path — verifying Evaluation
+        // must also update the actual score, not just log the sign-off.
+        if (fohShift === 'evaluation') {
+          if ((_fohYN.yes||0) + (_fohYN.no||0) === 0) {
+            updates['submissions/' + child.key + '/evalNotVisited'] = true;
+            updates['submissions/' + child.key + '/oicEvalPct'] = null;
+          } else {
+            const _fohEvalPct2 = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
+            updates['submissions/' + child.key + '/oicEvalPct'] = _fohEvalPct2;
+            updates['submissions/' + child.key + '/evalNotVisited'] = false;
+          }
+        }
       }
     });
     if (!Object.keys(updates).length) { showToast('No matching record', 'warn'); return; }
     fohDb.ref().update(updates).then(() => {
       staff.verifiedBy = name; staff.verifiedByRole = currentRole;
       staff.verifiedAt = now; staff.verificationLog = log;
+      if (fohShift === 'evaluation') {
+        if ((_fohYN.yes||0) + (_fohYN.no||0) === 0) {
+          staff.evalNotVisited = true; staff.oicEvalPct = null;
+        } else {
+          staff.oicEvalPct = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
+          staff.evalNotVisited = false;
+        }
+      }
       allFOHData.forEach(r => {
         if (r.staffName===staff.staffName && r.role===staff.role && r.week===staff.week) {
           r.verifiedBy      = name;
@@ -12340,6 +12436,8 @@ function saveFOHMultiVerify() {
             r.verificationLog = staff.verificationLog;
             r.verifiedBy      = staff.verifiedBy;
             r.verifiedByRole  = staff.verifiedByRole;
+            r.evalNotVisited  = staff.evalNotVisited === true;
+            r.oicEvalPct      = staff.oicEvalPct != null ? staff.oicEvalPct : null;
           }
         });
       });
