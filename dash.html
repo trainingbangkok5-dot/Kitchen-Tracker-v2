@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703130000">
+<meta name="app-version" content="20260703140000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7114,7 +7114,7 @@ function deleteRecord(fbKey, staffName, week) {
     fohDb.ref('submissions').orderByChild('staffName').equalTo(staffName).once('value', snap => {
       if (snap.exists()) {
         const updates = {};
-        snap.forEach(child => { if (child.val().week === week) updates['submissions/'+child.key] = null; });
+        snap.forEach(child => { if ((child.val().businessDate || child.val().week) === week) updates['submissions/'+child.key] = null; });
         if (Object.keys(updates).length) {
           fohDb.ref().update(updates).then(() => {
             allStaff = allStaff.filter(s => !(s.staffName===staffName && s.week===week));
@@ -7139,7 +7139,7 @@ function deleteRecord(fbKey, staffName, week) {
     if (data[fbKey]) { foundKey = fbKey; }
     if (!foundKey) {
       Object.keys(data).forEach(function(key) {
-        if (!foundKey && data[key] && data[key].staffName === staffName && data[key].week === week) {
+        if (!foundKey && data[key] && data[key].staffName === staffName && (data[key].businessDate || data[key].week) === week) {
           foundKey = key;
         }
       });
@@ -12081,7 +12081,7 @@ function deleteFOHStaff(name, role, week) {
     const updates = {};
     snap.forEach(child => {
       const sub = child.val();
-      if (sub.role === role && sub.week === week) {
+      if (sub.role === role && (sub.businessDate || sub.week) === week) {
         updates[child.key] = null;
       }
     });
@@ -14604,7 +14604,7 @@ async function deleteSelectedBOH() {
   if (snap.exists()) {
     snap.forEach(child => {
       const sub = child.val();
-      const rowKey = (sub.staffName||'') + '_' + (sub.role||'') + '_' + (sub.week||'');
+      const rowKey = (sub.staffName||'') + '_' + (sub.role||'') + '_' + (sub.businessDate || sub.week || '');
       if (keys.includes(rowKey)) updates['submissions/' + child.key] = null;
     });
   }
@@ -14813,7 +14813,7 @@ async function deleteSelectedFOH() {
   if (snap.exists()) {
     snap.forEach(child => {
       const sub = child.val();
-      const rowKey = (sub.staffName||'') + '_' + (sub.role||'') + '_' + (sub.week||'');
+      const rowKey = (sub.staffName||'') + '_' + (sub.role||'') + '_' + (sub.businessDate || sub.week || '');
       if (keys.includes(rowKey)) updates['submissions/' + child.key] = null;
     });
   }
