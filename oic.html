@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703190000">
+<meta name="app-version" content="20260703210000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="20260615280000">
@@ -1331,6 +1331,33 @@ function renderDay() {
   btnRow.style.cssText = 'display:flex;align-items:center;flex-wrap:wrap;';
   btnRow.appendChild(backBtn);
   btnRow.appendChild(clearBtn);
+  // ── Debug button (2026-07-03) — see kic2.html for full explanation.
+  const debugBtn = document.createElement('button');
+  debugBtn.style.cssText = 'display:flex;align-items:center;gap:6px;margin:12px 0 0 8px;padding:6px 12px;border:1.5px solid #94A3B8;border-radius:20px;font-size:12px;font-weight:600;color:#475569;background:#fff;cursor:pointer;';
+  debugBtn.innerHTML = '🔍 Debug';
+  debugBtn.onclick = () => {
+    const d = load();
+    const dk = getTodayKey();
+    const todayData = d[dk] || {};
+    let html = '<div style="position:fixed;inset:0;background:#fff;z-index:999999;overflow-y:auto;padding:16px;font-family:monospace;font-size:11px;">';
+    html += '<button id="_closeDebugBtn" style="position:sticky;top:0;padding:10px 16px;background:#B91C1C;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;margin-bottom:12px;">Close</button>';
+    html += '<div style="margin-bottom:8px;"><b>SK:</b> ' + SK + '</div>';
+    html += '<div style="margin-bottom:8px;"><b>Today key:</b> ' + dk + '</div>';
+    html += '<div style="margin-bottom:8px;"><b>Tasks with data:</b> ' + Object.keys(todayData).join(', ') + '</div>';
+    Object.keys(todayData).forEach(taskId => {
+      const t = todayData[taskId];
+      html += '<div style="margin-top:12px;padding:10px;background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0;">';
+      html += '<div style="font-weight:700;color:#1A3C5E;margin-bottom:6px;">Task: ' + taskId + '</div>';
+      html += '<pre style="white-space:pre-wrap;word-break:break-all;margin:0;">' + JSON.stringify(t, null, 2).replace(/</g,'&lt;') + '</pre>';
+      html += '</div>';
+    });
+    html += '</div>';
+    const overlay = document.createElement('div');
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    document.getElementById('_closeDebugBtn').onclick = () => overlay.remove();
+  };
+  btnRow.appendChild(debugBtn);
   container.appendChild(btnRow);
 
   const isSubmitted = currentShift === 'opening' ? openingDone : closingDone;
