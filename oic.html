@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703180000">
+<meta name="app-version" content="20260703190000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="20260615280000">
@@ -1760,21 +1760,27 @@ function handlePhotoFile(file, explicitTaskId) {
   if (!taskId) return;
   activePhotoTask = null;
   closePhotoModal(); // ← auto-close modal immediately after photo selected
-  compressAndReturn(file, async function(dataUrl) {
-    // Support multiple photos — find next available slot
-    const data = load();
-    const dayKey = getTodayKey();
-    if (!data[dayKey]) data[dayKey] = {};
-    if (!data[dayKey][taskId]) data[dayKey][taskId] = {};
-    // Find next photo slot — check BOTH base64 (photo) and Cloudinary (photoUrl) keys
-    let slot = 'photo';
-    for (let _pi = 0; _pi < 10; _pi++) {
-      const _lk = _pi === 0 ? 'photo' : 'photo_' + _pi;
-      const _uk = _pi === 0 ? 'photoUrl' : 'photoUrl_' + _pi;
-      if (!data[dayKey][taskId][_lk] && !data[dayKey][taskId][_uk]) {
-        slot = _lk; break;
-      }
+
+  // ── Fix (2026-07-03): reserve the photo slot SYNCHRONOUSLY, before
+  // compression starts — see kic2.html for full explanation. Without this,
+  // two photos uploaded close together could both compute the same empty
+  // slot and one would silently overwrite the other.
+  const _dataReserve = load();
+  const _dayKeyReserve = getTodayKey();
+  if (!_dataReserve[_dayKeyReserve]) _dataReserve[_dayKeyReserve] = {};
+  if (!_dataReserve[_dayKeyReserve][taskId]) _dataReserve[_dayKeyReserve][taskId] = {};
+  let _reservedSlot = 'photo';
+  for (let _pi = 0; _pi < 10; _pi++) {
+    const _lk = _pi === 0 ? 'photo' : 'photo_' + _pi;
+    const _uk = _pi === 0 ? 'photoUrl' : 'photoUrl_' + _pi;
+    if (!_dataReserve[_dayKeyReserve][taskId][_lk] && !_dataReserve[_dayKeyReserve][taskId][_uk]) {
+      _reservedSlot = _lk; break;
     }
+  }
+  setVal(currentDay, taskId, _reservedSlot, 'pending');
+
+  compressAndReturn(file, async function(dataUrl) {
+    const slot = _reservedSlot;
     // Save locally first for instant display
     setVal(currentDay, taskId, slot, dataUrl);
     renderDay();

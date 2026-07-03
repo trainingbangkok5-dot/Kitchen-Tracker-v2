@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703180000">
+<meta name="app-version" content="20260703190000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="20260615290000">
@@ -1695,16 +1695,28 @@ function handlePhotoFile(file, explicitTaskId) {
   if (!taskId) return;
   activePhotoTask = null;
   closePhotoModal();
+
+  // ── Fix (2026-07-03): reserve the photo slot SYNCHRONOUSLY, right now,
+  // before compression even starts. Compression is async and its duration
+  // varies — if two photos are uploaded close together, the previous
+  // version only calculated "which slot is free" AFTER compression
+  // finished, so both could see the same empty slot and one would silently
+  // overwrite the other. Reserving immediately with a placeholder closes
+  // that window completely.
+  const _dReserve = load(); const _dkReserve = getTodayKey();
+  if (!_dReserve[_dkReserve]) _dReserve[_dkReserve] = {};
+  if (!_dReserve[_dkReserve][taskId]) _dReserve[_dkReserve][taskId] = {};
+  let _reservedIdx = 0;
+  while (_reservedIdx < 10 && ((_dReserve[_dkReserve][taskId][_reservedIdx === 0 ? 'photo' : 'photo_' + _reservedIdx]) ||
+         (_dReserve[_dkReserve][taskId][_reservedIdx === 0 ? 'photoUrl' : 'photoUrl_' + _reservedIdx]))) _reservedIdx++;
+  if (_reservedIdx >= 10) { showToast('Maximum 10 photos reached for this task', 'warn'); return; }
+  const _reservedKey = _reservedIdx === 0 ? 'photo' : 'photo_' + _reservedIdx;
+  // Write a tiny placeholder immediately so any concurrent upload sees this slot as taken
+  setVal(currentDay, taskId, _reservedKey, 'pending');
+
   compressAndReturn(file, async function(dataUrl) {
-    // Find next available photo slot
-    const _d = load(); const _dk = getTodayKey();
-    if (!_d[_dk]) _d[_dk] = {};
-    if (!_d[_dk][taskId]) _d[_dk][taskId] = {};
-    let _idx = 0;
-    while (_idx < 10 && ((_d[_dk][taskId][_idx === 0 ? 'photo' : 'photo_' + _idx]) ||
-           (_d[_dk][taskId][_idx === 0 ? 'photoUrl' : 'photoUrl_' + _idx]))) _idx++;
-    if (_idx >= 10) { showToast('Maximum 10 photos reached for this task', 'warn'); return; }
-    const _photoKey = _idx === 0 ? 'photo' : 'photo_' + _idx;
+    const _idx = _reservedIdx;
+    const _photoKey = _reservedKey;
     setVal(currentDay, taskId, _photoKey, dataUrl);
     renderDay();
     showToast('Photo saved ✓', 'ok');
