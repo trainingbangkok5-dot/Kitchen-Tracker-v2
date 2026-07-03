@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="app-version" content="20260702200000">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="20260615280000">
+<script>
+// ── Auto-clear base64 on startup — prevents storage full error ────────────
+(function() {
+  try {
+    Object.keys(localStorage).forEach(function(key) {
+      try {
+        var raw = localStorage.getItem(key);
+        if (!raw || raw.indexOf('data:image') === -1) return;
+        var d = JSON.parse(raw);
+        var changed = false;
+        Object.keys(d).forEach(function(dk) {
+          if (!d[dk] || typeof d[dk] !== 'object') return;
+          Object.keys(d[dk]).forEach(function(tk) {
+            var task = d[dk][tk];
+            if (!task || typeof task !== 'object') return;
+            ['photo','photo_1','photo_2','photo_3','photo_4','photo_5',
+             'photo_6','photo_7','photo_8','photo_9'].forEach(function(pk) {
+              var urlKey = pk === 'photo' ? 'photoUrl' : pk.replace('photo_','photoUrl_');
+              var hasCloudUrl = task[urlKey] && task[urlKey].startsWith('http');
+              // Only strip base64 if Cloudinary URL already exists for this slot
+              if (hasCloudUrl && task[pk] && typeof task[pk] === 'string' && task[pk].startsWith('data:')) {
+                delete task[pk]; changed = true;
+              }
+            });
+          });
+        });
+        if (changed) localStorage.setItem(key, JSON.stringify(d));
+      } catch(e) {}
+    });
+  } catch(e) {}
+})();
+
+// Force fresh load — clear old cached version
+(function() {
+  var v = document.querySelector('meta[name="app-version"]').content;
+  var stored = localStorage.getItem('app_version_oic');
+  if (stored !== v) {
+    try { localStorage.setItem('app_version_oic', v); } catch(e) {}
+    location.reload(true);
+  }
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png">
+<meta name="apple-mobile-web-app-title" content="OIC Checklist">
+<meta name="application-name" content="Culex Kitchen">
+<meta name="theme-color" content="#7B2D42">
+<meta name="format-detection" content="telephone=no">
+<title>OIC Checklist</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background:#F8FAFC; color:#0F172A; padding-bottom:60px; -webkit-font-smoothing:antialiased; }
+.header { background:#7C2D12; padding:16px 16px 14px; position:sticky; top:0; z-index:100; box-shadow:0 2px 12px rgba(0,0,0,0.2); }
+.role-badge { display:inline-block; background:#E87722; color:#fff; font-size:11px; font-weight:700; letter-spacing:0.08em; padding:3px 10px; border-radius:20px; text-transform:uppercase; margin-bottom:8px; }
+.header h1 { color:#fff; font-size:17px; font-weight:700; }
+.header-sub { color:rgba(255,255,255,0.6); font-size:11px; margin-top:2px; }
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:10px; }
+.info-field { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.18); border-radius:8px; padding:7px 10px; }
+.info-field label { display:block; font-size:9px; color:rgba(255,255,255,0.55); font-weight:700; letter-spacing:0.07em; text-transform:uppercase; margin-bottom:2px; }
+.info-field input { background:transparent; border:none; outline:none; color:#fff; font-size:13px; font-weight:500; width:100%; -webkit-appearance:none; }
+.info-field input::placeholder { color:rgba(255,255,255,0.3); }
+.score-bar { background:#fff; border-bottom:1px solid #E2E8F0; padding:10px 16px; display:flex; align-items:center; gap:10px; }
+.score-track { flex:1; height:5px; background:#E2E8F0; border-radius:3px; overflow:hidden; }
+.score-fill { height:100%; border-radius:3px; background:#E87722; transition:width 0.4s; }
+.score-pct { font-size:13px; font-weight:700; color:#7C2D12; min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
+.day-rail { background:#fff; border-bottom:1px solid #E2E8F0; padding:9px 14px; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.day-rail::-webkit-scrollbar { display:none; }
+.day-pill { flex-shrink:0; padding:5px 14px; border-radius:20px; border:1.5px solid #E2E8F0; background:#fff; font-size:12px; font-weight:700; color:#64748B; cursor:pointer; white-space:nowrap; -webkit-appearance:none; transition:all 0.15s; }
+.day-pill.active { background:#7C2D12; border-color:#7C2D12; color:#fff; }
+.day-pill.done { border-color:#22C55E; color:#0F766E; }
+.day-pill.done.active { background:#7C2D12; color:#fff; }
+.day-pill.locked { opacity:0.35; cursor:not-allowed; }
+.content { padding:12px 16px; }
+.section-hdr { background:#E87722; border-radius:10px 10px 0 0; padding:9px 14px; margin-top:16px; font-size:12px; font-weight:700; color:#fff; letter-spacing:0.03em; text-transform:uppercase; }
+.task-card { background:#fff; border:1px solid #E2E8F0; border-top:none; padding:12px 13px; }
+.task-card:last-child { border-radius:0 0 10px 10px; }
+.task-card.locked-card { opacity:0.7; pointer-events:none; }
+.task-top { display:flex; align-items:flex-start; gap:9px; margin-bottom:9px; }
+.owner-tag { font-size:8px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; padding:2px 6px; border-radius:4px; white-space:nowrap; margin-top:2px; flex-shrink:0; }
+.ot-self { background:#FEF3C7; color:#92400E; }
+.ot-verify { background:#FFE4E1; color:#1E40AF; }
+.ot-monitor { background:#D1FAE5; color:#065F46; }
+.ot-record { background:#EDE9FE; color:#5B21B6; }
+.ot-auditor { background:#FCE7F3; color:#9D174D; }
+.task-text { font-size:13px; font-weight:500; line-height:1.4; flex:1; }
+.yn-row { display:flex; gap:6px; }
+.yn { flex:1; padding:9px 4px; border-radius:8px; border:1.5px solid #E2E8F0; background:#F8FAFC; font-size:12px; font-weight:700; color:#64748B; text-align:center; cursor:pointer; -webkit-appearance:none; transition:all 0.12s; }
+.yn:active { transform:scale(0.96); }
+.yn.yes.on { background:#DCFCE7; border-color:#22C55E; color:#0F766E; }
+.yn.no.on  { background:#FEE2E2; border-color:#EF4444; color:#B91C1C; }
+.yn.na.on  { background:#F3F4F6; border-color:#9CA3AF; color:#374151; }
+.photo-row { margin-top:9px; display:flex; align-items:center; gap:8px; }
+.photo-btn { display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1.5px dashed #CBD5E1; border-radius:9px; padding:8px 12px; cursor:pointer; font-size:12px; font-weight:600; color:#64748B; -webkit-appearance:none; transition:all 0.15s; }
+.photo-btn.taken { border-style:solid; border-color:#22C55E; color:#0F766E; background:#F0FDF4; }
+.photo-btn:active { transform:scale(0.97); }
+.photo-thumb { width:44px; height:44px; border-radius:8px; object-fit:cover; border:2px solid #22C55E; flex-shrink:0; }
+.status-card { margin:16px 0 0; border-radius:12px; padding:16px; text-align:center; border:2px solid #E2E8F0; background:#fff; }
+.status-card.pass { background:#F0FDF4; border-color:#22C55E; }
+.status-card.fail { background:#FEF2F2; border-color:#EF4444; }
+.sc-icon { font-size:28px; margin-bottom:5px; }
+.sc-title { font-size:16px; font-weight:700; margin-bottom:3px; }
+.sc-score { font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; margin:6px 0; }
+.sc-sub { font-size:12px; color:#64748B; }
+.submit-btn { display:block; width:100%; margin-top:12px; padding:14px; background:#7C2D12; color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; -webkit-appearance:none; transition:background 0.15s; }
+.submit-btn:active { opacity:0.85; }
+.submit-btn:disabled { background:#94A3B8; cursor:not-allowed; }
+
+.time-stamp-card { background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:11px 14px; margin-top:10px; display:flex; gap:14px; }
+.ts-block { flex:1; text-align:center; }
+.ts-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#94A3B8; margin-bottom:3px; }
+.ts-value { font-size:13px; font-weight:700; color:#0F172A; }
+.ts-date  { font-size:10px; color:#64748B; margin-top:1px; }
+.ts-divider { width:1px; background:#E2E8F0; flex-shrink:0; }
+
+.synced-msg { text-align:center; font-size:12px; color:#0F766E; font-weight:600; margin-top:8px; }
+.comment-field { width:100%; margin-top:6px; padding:6px 10px; border:1px solid #E0DDD4; border-radius:8px; font-size:12px; color:#374151; background:#F8FAFC; resize:none; font-family:inherit; }
+.comment-field:focus { outline:none; border-color:#94A3B8; background:#fff; }
+.locked-msg { background:#FEF9C3; border:1px solid #FDE68A; border-radius:10px; padding:10px 14px; text-align:center; font-size:13px; font-weight:600; color:#92400E; margin:16px 0 0; }
+/* OVERWRITE PANEL (Area Manager / Admin only) */
+.overwrite-panel { background:#FEF2F2; border:1.5px solid #FCA5A5; border-radius:10px; padding:12px 14px; margin-top:14px; }
+.overwrite-title { font-size:12px; font-weight:700; color:#B91C1C; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+.overwrite-input { width:100%; padding:8px 11px; border:1.5px solid #FCA5A5; border-radius:8px; font-size:13px; background:#fff; outline:none; -webkit-appearance:none; margin-bottom:8px; }
+.overwrite-input:focus { border-color:#EF4444; }
+.overwrite-btn { width:100%; padding:10px; background:#EF4444; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; -webkit-appearance:none; }
+/* PHOTO MODAL */
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:999; align-items:flex-end; justify-content:center; }
+.modal-bg.open { display:flex; }
+.modal-box { background:#fff; border-radius:20px 20px 0 0; padding:22px 18px 36px; width:100%; max-width:440px; }
+.modal-title { font-size:16px; font-weight:700; margin-bottom:4px; }
+.modal-sub { font-size:12px; color:#64748B; margin-bottom:18px; }
+.mbtn { display:block; width:100%; padding:13px; border-radius:10px; border:none; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:8px; -webkit-appearance:none; }
+.mbtn-cam { background:#7C2D12; color:#fff; }
+.mbtn-gal { background:#FFF1F0; color:#E87722; }
+.mbtn-cancel { background:#F8FAFC; color:#64748B; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+<div class="header">
+  <div class="role-badge">🧑‍💼 OIC</div>
+  <h1>OIC 6-Day Checklist</h1>
+  <div class="header-sub">OIC • Daily verification</div>
+  <div class="info-grid">
+    <div class="info-field"><label>OIC Name</label><input id="fName" oninput="this.value=toTitleCase(this.value)" type="text" placeholder="OIC name..." autocomplete="name" autocorrect="off" autocapitalize="words"><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:3px;">e.g. Juan dela Cruz — Full name, proper case</div></div>
+    <div class="info-field"><label>Outlet</label><select id="fOutlet" style="background:transparent;border:none;outline:none;color:#fff;font-size:13px;font-weight:500;width:100%;cursor:pointer;">
+<option value="" style="color:#000">Select outlet...</option>
+<optgroup label="Little Bangkok" style="color:#000">
+<option value="LB DSO" style="color:#000">LB DSO</option>
+<option value="LB Tower" style="color:#000">LB Tower</option>
+<option value="LB Hamra" style="color:#000">LB Hamra</option>
+<option value="LB JLT" style="color:#000">LB JLT</option>
+<option value="LB OM" style="color:#000">LB OM</option>
+<option value="LB DHE" style="color:#000">LB DHE</option>
+<option value="LB MTC" style="color:#000">LB MTC</option>
+</optgroup>
+<optgroup label="Superbowl" style="color:#000">
+<option value="SB Deira" style="color:#000">SB Deira</option>
+<option value="SB DG" style="color:#000">SB DG</option>
+</optgroup>
+<optgroup label="The Red Door" style="color:#000">
+<option value="The Red Door" style="color:#000">The Red Door</option>
+</optgroup>
+</select></div>
+    <div class="info-field"><label>📅 Today's Date</label><div id="fWeek" style="color:#fff;font-size:13px;font-weight:600;padding:2px 0;min-height:20px;">—</div></div>
+    <div class="info-field"><label>Verified By (Area Manager)</label><div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px 12px;font-size:12px;color:rgba(255,255,255,0.5);font-style:italic;">🔒 Filled by Area Manager via dashboard</div></div>
+  </div>
+  <div style="margin-top:4px;text-align:right;padding-right:4px;">
+    <span onclick="clearAllData()" style="cursor:pointer;font-size:8px;color:transparent;user-select:none;">⚙</span>
+  </div>
+</div>
+<div class="score-bar">
+  <span style="font-size:12px;color:#64748B;font-weight:500;">Today's score</span>
+  <div class="score-track"><div class="score-fill" id="scoreFill" style="width:0%"></div></div>
+  <span class="score-pct" id="scorePct">0%</span>
+</div>
+<div class="day-rail" id="dayRail" style="display:none;"></div>
+<div class="content" id="mainContent"></div>
+
+<div class="modal-bg" id="photoModal">
+  <div class="modal-box">
+    <div class="modal-title">📷 Photo Proof</div>
+    <div class="modal-sub" id="modalLabel">Take a clear photo of this task</div>
+    <button class="mbtn mbtn-cam" onclick="triggerCamera()">📸 Take Photo Now</button>
+    <button class="mbtn mbtn-gal" onclick="triggerGallery()">🖼 Choose from Gallery</button>
+    <button class="mbtn mbtn-cancel" onclick="closePhotoModal()">Cancel</button>
+  </div>
+</div>
+<input type="file" id="camInput" accept="image/*" capture="environment" style="position:fixed;top:-200px;left:-200px;opacity:0;width:1px;height:1px;">
+<input type="file" id="galInput" accept="image/*" style="position:fixed;top:-200px;left:-200px;opacity:0;width:1px;height:1px;">
+
+<script>
+
+// ══ FIREBASE CONFIG ════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDxc1zrvdv65kIzfP63CId2MdcoOCmIQPU",
+  authDomain:        "culex-foh.firebaseapp.com",
+  databaseURL:       "https://culex-foh-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "culex-foh",
+  storageBucket:     "culex-foh.firebasestorage.app",
+  messagingSenderId: "571343979493",
+  appId:             "1:571343979493:web:ae4a6f75106bc87a1be50c"
+};
+// ══════════════════════════════════════════════════════════════
+
+// Init Firebase
+let _db = null;
+function showChecklistLockedScreen() {
+  if (document.getElementById('checklistLockedOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'checklistLockedOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#1A3C5E;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;';
+  overlay.innerHTML =
+    '<div style="max-width:380px;">' +
+      '<div style="font-size:48px;margin-bottom:16px;">🔒</div>' +
+      '<div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:10px;">Checklist Temporarily Unavailable</div>' +
+      '<div style="color:rgba(255,255,255,0.75);font-size:14px;line-height:1.5;">This checklist has been temporarily disabled. Please check with your Training Manager or supervisor before continuing.</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+}
+
+function hideChecklistLockedScreen() {
+  const overlay = document.getElementById('checklistLockedOverlay');
+  if (overlay) overlay.remove();
+  document.body.style.overflow = '';
+}
+
+function initFirebase() {
+  try {
+    if (typeof firebase === 'undefined') { setTimeout(initFirebase, 100); return; }
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    _db = firebase.database();
+    // ── Remote checklist lock-check (2026-07-02, LIVE) ────────────────
+    _db.ref('system/checklistEnabled/' + ROLE).on('value', snap => {
+      if (snap.exists() && snap.val() === false) {
+        showChecklistLockedScreen();
+      } else {
+        hideChecklistLockedScreen();
+      }
+    });
+  } catch(e) { console.error('Firebase init error:', e); }
+}
+initFirebase();
+
+function pushToFirebase(record) {
+  if (!_db) { setTimeout(()=>pushToFirebase(record), 500); return; }
+  try {
+    const safeStr = s => (s||'').replace(/[^a-zA-Z0-9]/g,'_');
+    const key = safeStr(record.staffName)
+              + '_' + safeStr(record.role)
+              + '_' + safeStr(record.outlet)
+              + '_' + safeStr(record.week)
+              + '_' + (record.shift || 'opening');
+    _db.ref('submissions/' + key + '/submittedDates').once('value', function(_dSnap) {
+      var _fbD = _dSnap.val();
+      _fbD = Array.isArray(_fbD) ? _fbD : (_fbD && typeof _fbD==='object' ? Object.values(_fbD) : []);
+      var _locD = Array.isArray(record.submittedDates) ? record.submittedDates : [];
+      record = Object.assign({}, record, { submittedDates: Array.from(new Set(_fbD.concat(_locD))).filter(Boolean).sort() });
+      _db.ref('submissions/' + key).set({
+        ...record,
+        lastUpdated: new Date().toISOString()
+      }).then(() => {
+      showToast('✓ Synced to dashboard', 'ok');
+    }).catch(e => {
+      console.warn('Firebase write failed:', e);
+      showSyncError('Sync failed — will retry. (' + e.message + ')');
+      queueRetry(record);
+    });
+    });
+  } catch(e) {
+    console.warn('Firebase error:', e);
+    showToast('⚠ Firebase error: ' + e.message, 'error');
+  }
+}
+
+
+// ── Cloudinary Photo Upload ───────────────────────────────────
+const CLOUDINARY_CLOUD = 'db94rgiil';
+const CLOUDINARY_PRESET = 'culex_uploads';
+
+function dataURLtoBlob(dataUrl) {
+  try {
+    const parts = dataUrl.split(',');
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const bstr = atob(parts[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) u8arr[n] = bstr.charCodeAt(n);
+    return new Blob([u8arr], { type: mime });
+  } catch(e) { return null; }
+}
+
+async function uploadPhotoToFirebase(dataUrl, taskId, staffName, day) {
+  try {
+    if (!dataUrl) return null;
+    const compressed = await compressToSize(dataUrl, 60);
+    // Try Cloudinary first
+    try {
+      const blob = dataURLtoBlob(compressed);
+      if (!blob) throw new Error('blob conversion failed');
+      const folder = 'culex/' + ROLE + '/' + (staffName||'unknown').replace(/[^a-zA-Z0-9]/g,'_');
+      const fd = new FormData();
+      fd.append('file', blob);
+      fd.append('upload_preset', CLOUDINARY_PRESET);
+      fd.append('folder', folder);
+      fd.append('quality', 'auto:best');
+      const resp = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', {
+        method: 'POST', body: fd
+      });
+      const data = await resp.json();
+      if (data.secure_url) {
+        console.log('Photo uploaded to Cloudinary ✓');
+        return data.secure_url;
+      }
+    } catch(cloudErr) {
+      console.warn('Cloudinary unavailable, saving locally:', cloudErr);
+    }
+    // Fallback — save base64 locally, queue for retry
+    showToast('Photo saved locally — will sync when online 📱', 'ok');
+    const pendingKey = 'pending_photos_' + ROLE;
+    const pending = JSON.parse(localStorage.getItem(pendingKey) || '[]');
+    const photoEntry = {
+      dataUrl: compressed,
+      taskId, staffName, day,
+      savedAt: new Date().toISOString()
+    };
+    pending.push(photoEntry);
+    localStorage.setItem(pendingKey, JSON.stringify(pending));
+    // Return compressed base64 as fallback so photo shows immediately
+    return compressed;
+  } catch(e) {
+    console.warn('Photo save failed completely:', e);
+    return null;
+  }
+}
+
+// Retry pending photos when back online
+async function retryPendingPhotos() {
+  const pendingKey = 'pending_photos_' + ROLE;
+  const pending = JSON.parse(localStorage.getItem(pendingKey) || '[]');
+  if (!pending.length) return;
+  showToast('Retrying ' + pending.length + ' pending photo(s)...', 'ok');
+  const remaining = [];
+  for (const p of pending) {
+    try {
+      const res = await fetch(p.dataUrl);
+      const blob = await res.blob();
+      const folder = 'culex/' + ROLE + '/' + (p.staffName||'unknown').replace(/[^a-zA-Z0-9]/g,'_');
+      const fd = new FormData();
+      fd.append('file', blob);
+      fd.append('upload_preset', CLOUDINARY_PRESET);
+      fd.append('folder', folder);
+      fd.append('quality', 'auto:best');
+      const resp = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', {
+        method: 'POST', body: fd
+      });
+      const data = await resp.json();
+      if (data.secure_url) {
+        console.log('Pending photo uploaded ✓');
+      } else {
+        remaining.push(p);
+      }
+    } catch(e) {
+      remaining.push(p);
+    }
+  }
+  localStorage.setItem(pendingKey, JSON.stringify(remaining));
+  if (remaining.length === 0) showToast('All pending photos uploaded ✓', 'ok');
+  else showToast(remaining.length + ' photo(s) still pending', 'warn');
+}
+
+// Auto-retry when online
+window.addEventListener('online', retryPendingPhotos);
+
+// Compress image to target size in KB
+function compressToSize(dataUrl, maxKB) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      // Scale down if too large
+      const maxDim = 600;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim/w); w = maxDim; }
+        else { w = Math.round(w * maxDim/h); h = maxDim; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // Try quality 0.7 first
+      let result = canvas.toDataURL('image/jpeg', 0.5);
+      if (result.length > maxKB * 1024 * 1.37) {
+        result = canvas.toDataURL('image/jpeg', 0.25);
+      }
+      resolve(result);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function pushAuditToFirebase(record) {
+  try {
+    const key = (record.outlet||'unknown').replace(/[^a-zA-Z0-9]/g,'_')
+              + '_' + record.auditType
+              + '_' + (record.auditDate||'').replace(/[^a-zA-Z0-9]/g,'_');
+    _db.ref('audits/' + key).set({
+      ...record,
+      lastUpdated: new Date().toISOString()
+    }).catch(e => console.warn('Audit write failed:', e));
+  } catch(e) { console.warn('Firebase audit error:', e); }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// SHARED DATABASE — all checklists write to same localStorage key
+// so master dashboard can read all submissions
+// ══════════════════════════════════════════════════════════════
+const SHARED_DB_KEY = 'OIC_SHARED_DB_V2';
+
+function loadSharedDB() {
+  try { return JSON.parse(localStorage.getItem(SHARED_DB_KEY)) || { submissions: [] }; }
+  catch(e) { return { submissions: [] }; }
+}
+function saveSharedDB(db) {
+  try { localStorage.setItem(SHARED_DB_KEY, JSON.stringify(db)); } catch(e) {}
+}
+
+
+// ── Full Name Validation ─────────────────────────────────────
+
+let _registryData  = null;
+let _registryNames = null;
+
+async function loadRegistryData() {
+  if (_registryData !== null) return _registryData;
+  let waited = 0;
+  while (!_db && waited < 5000) {
+    await new Promise(r => setTimeout(r, 200));
+    waited += 200;
+  }
+  if (!_db) return null;
+  try {
+    const snap = await _db.ref('registry').once('value');
+    const data = snap.val() || {};
+    _registryData = Object.values(data)
+      .filter(r => r.name && r.name.trim() && r.status !== 'inactive')
+      .map(r => ({
+        name:   (r.name||'').trim(),
+        empNo:  (r.empNo||r.employeeNo||r.employee_no||'').trim(),
+        role:   (r.role||'').trim(),
+        outlet: (r.outlet||'').trim(),
+      }));
+    _registryNames = _registryData.map(r => r.name.toLowerCase().replace(/\s+/g,' '));
+    return _registryData;
+  } catch(e) { return null; }
+}
+
+async function loadRegistryNames() {
+  await loadRegistryData();
+  return _registryNames;
+}
+
+async function validateStaffName(name) {
+  const names = await loadRegistryNames();
+  if (!names) return true;
+  const norm = (name||'').toLowerCase().trim().replace(/\s+/g,' ');
+  return names.includes(norm);
+}
+
+// ── Name autocomplete ─────────────────────────────────────────
+
+
+
+
+document.addEventListener('click', e => {
+  const dd = document.getElementById('nameDropdown');
+  const fn = document.getElementById('fName');
+  if (dd && fn && !fn.contains(e.target) && !dd.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
+
+
+async function validateStaffNameStrict(name) {
+  const raw = (name||'').trim().replace(/\s+/g,' ');
+  if (!raw) return { ok: false, msg: 'Please enter your name.', reason: 'empty' };
+
+  // ── Step 1: Title Case format check (PRIMARY — always enforced) ──────────
+  // Each word must start with uppercase, rest lowercase. Allows apostrophes/hyphens (O'Brien, Smith-Jones).
+  const words = raw.split(' ');
+  if (words.length < 2) {
+    return { ok: false, msg: 'Invalid name. Please enter your full name (first and last name).', reason: 'format' };
+  }
+  const titleCaseRe = /^[A-Z][a-zà-ÿ']*([\'-][A-Z][a-zà-ÿ']*)?$/;
+  const isTitleCase = words.every(w => titleCaseRe.test(w));
+  if (!isTitleCase) {
+    // Build the corrected suggestion to show the user
+    const suggested = words.map(w => w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(' ');
+    return { ok: false, msg: 'Invalid name format. Please enter your name with the first letter of each name capitalized (e.g., "' + suggested + '").', reason: 'format' };
+  }
+
+  // ── Step 2: Registry check (HARD — must match an active registry name) ───
+  // Staff must select their name from the dropdown (registry-backed). This
+  // prevents typos/casing/duplicate-name variants from fragmenting the data.
+  // If registry data failed to load entirely, we don't block (fail-open on
+  // infra issues only — not on genuine mismatches).
+  await loadRegistryData();
+  if (_registryData && _registryData.length) {
+    const normRaw = raw.toLowerCase();
+    const exactMatch = _registryData.find(r => (r.name||'').toLowerCase() === normRaw);
+    if (!exactMatch) {
+      window._nameNotInRegistry = true;
+      return {
+        ok: false,
+        reason: 'not_in_registry',
+        msg: 'Name not found in staff registry. Please tap your name from the suggestion list as you type. If you are new or your name is missing, you can request to be added below.'
+      };
+    }
+    window._nameNotInRegistry = false;
+  }
+
+  return { ok: true };
+}
+
+
+let _nameSelectedFromRegistry = false;
+
+function onNameInput(val) {
+  _nameSelectedFromRegistry = false; // reset if typing manually
+  const dropdown = document.getElementById('nameDropdown');
+  const empNoField = document.getElementById('fEmpNo');
+  if (!dropdown) return;
+  if (!val || val.length < 2) {
+    dropdown.style.display = 'none';
+    if (empNoField) empNoField.value = '';
+    return;
+  }
+  const norm = val.toLowerCase().trim();
+  const matches = (_registryData||[]).filter(r =>
+    r.name.toLowerCase().includes(norm) &&
+    (r.role === ROLE || r.role === '' || !r.role)
+  );
+  if (!matches.length) {
+    dropdown.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:#E53E3E;font-weight:500;">⚠ No match found — please use your exact registered name</div>';
+    dropdown.style.display = 'block';
+    if (empNoField) empNoField.value = '';
+    return;
+  }
+  dropdown.innerHTML = matches.map(r => `
+    <div onclick="selectStaffName('${r.name.replace(/'/g,"\'")}','${r.empNo}','${r.outlet}')"
+      style="padding:10px 14px;cursor:pointer;border-bottom:0.5px solid #F1F5F9;font-size:13px;"
+      onmouseover="this.style.background='#F0F9FF'" onmouseout="this.style.background='#fff'">
+      <div style="font-weight:600;color:#1A3C5E;">${r.name}</div>
+      <div style="font-size:11px;color:#64748B;">${r.empNo ? 'EMP# ' + r.empNo + ' · ' : ''}${r.outlet||''}</div>
+    </div>`).join('');
+  dropdown.style.display = 'block';
+}
+
+function selectStaffName(name, empNo, outlet) {
+  const nameField = document.getElementById('fName');
+  const empNoField = document.getElementById('fEmpNo');
+  const outletField = document.getElementById('fOutlet');
+  const dropdown = document.getElementById('nameDropdown');
+  if (nameField) nameField.value = name;
+  if (empNoField) empNoField.value = empNo || '';
+  if (outletField && outlet) outletField.value = outlet;
+  if (dropdown) dropdown.style.display = 'none';
+  _nameSelectedFromRegistry = true;
+  localStorage.setItem('kic_info_' + ROLE + '_fName', name);
+  localStorage.setItem('kic_info_' + ROLE + '_fEmpNo', empNo || '');
+  showToast('\u2713 ' + name + (empNo ? ' (EMP# ' + empNo + ')' : ''), 'ok');
+}
+
+document.addEventListener('click', e => {
+  const dd = document.getElementById('nameDropdown');
+  const fn = document.getElementById('fName');
+  if (dd && fn && !fn.contains(e.target) && !dd.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
+
+function validateFullName(name) {
+  if (!name || !name.trim()) {
+    return { valid: false, msg: 'Please enter your full name before submitting.' };
+  }
+  const trimmed = name.trim();
+  // Letters and spaces only
+  if (!/^[a-zA-Z\s]+$/.test(trimmed)) {
+    return { valid: false, msg: 'Name must contain letters only — no numbers or special characters.' };
+  }
+  // At least 2 words
+  const words = trimmed.split(/\s+/).filter(w => w.length > 0);
+  if (words.length < 2) {
+    return { valid: false, msg: 'Please enter your full name (first and last name required).' };
+  }
+  // Proper case — each word starts with capital
+  const properCase = words.every(w => w[0] === w[0].toUpperCase() && w[0] !== w[0].toLowerCase());
+  if (!properCase) {
+    return { valid: false, msg: 'Please capitalize your name correctly (e.g. Juan dela Cruz).' };
+  }
+  return { valid: true, msg: '' };
+}
+function pushToMasterDashboard(record) {
+  // record: { staffName, role, outlet, week, day, overallPct, qualified, submittedAt, verifiedBy }
+  const db = loadSharedDB();
+  // Find existing entry for this staff + week and update, or add new
+  const idx = db.submissions.findIndex(
+    s => s.staffName === record.staffName &&
+         s.role === record.role &&
+         s.week === record.week &&
+         s.outlet === record.outlet
+  );
+  if (idx >= 0) {
+    db.submissions[idx] = { ...db.submissions[idx], ...record };
+  } else {
+    db.submissions.push(record);
+  }
+  saveSharedDB(db);
+}
+
+// ── Cross-device Camera & Gallery ────────────────────────────
+function prepareCamera() {
+  const input = document.getElementById('camInput');
+  if (!input) return;
+  input.setAttribute('capture', 'environment');
+  input.setAttribute('accept', 'image/*');
+  input.value = '';
+}
+function prepareGallery() {
+  const input = document.getElementById('galInput');
+  if (!input) return;
+  input.removeAttribute('capture');
+  input.setAttribute('accept', 'image/*');
+  input.value = '';
+}
+function _setupFileInput(id, withCapture, taskId) {
+  const old = document.getElementById(id);
+  if (!old) return null;
+  const input = document.createElement('input');
+  input.type = 'file'; input.id = id; input.accept = 'image/*';
+  input.style.cssText = 'position:fixed;top:-200px;left:-200px;opacity:0;width:1px;height:1px;';
+  if (withCapture) input.setAttribute('capture', 'environment');
+  old.parentNode.replaceChild(input, old);
+  input.addEventListener('change', function(e) {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      if (taskId) activePhotoTask = taskId;
+      handlePhotoFile(file);
+      setTimeout(function(){ try { input.value=''; } catch(e2){} }, 600);
+    }
+  });
+  return input;
+}
+function triggerCamera() {
+  const savedTask = activePhotoTask;
+  closePhotoModal();
+  setTimeout(function() {
+    const input = _setupFileInput('camInput', true, savedTask);
+    if (input) setTimeout(function() { input.click(); }, 50);
+  }, 150);
+}
+function triggerGallery() {
+  const savedTask = activePhotoTask;
+  closePhotoModal();
+  setTimeout(function() {
+    const input = _setupFileInput('galInput', false, savedTask);
+    if (input) setTimeout(function() { input.click(); }, 50);
+  }, 150);
+}
+
+function iosPhotoFix(inputEl, onDataUrl) {
+  inputEl.setAttribute('accept', 'image/*');
+}
+
+function compressAndReturn(file, callback) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const MAX = 400;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', 0.5));
+    };
+    img.onerror = function() { callback(ev.target.result); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Day unlock logic — only unlock next day, not future days ─────────────────
+function getTodayDayNumber(weekStartStr) {
+  if (!weekStartStr) return 1;
+  try {
+    // Use local calendar date (midnight-based, not 24hr rolling)
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' + 
+      String(now.getMonth()+1).padStart(2,'0') + '-' + 
+      String(now.getDate()).padStart(2,'0');
+    const today = new Date(todayStr + 'T00:00:00');
+    const start = new Date(weekStartStr + 'T00:00:00');
+    const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+    return Math.min(Math.max(diff + 1, 1), 6);
+  } catch(e) { return 1; }
+}
+
+function isDayUnlocked(dayNum, weekStartStr) {
+  return true; // All days visible — correct day auto-selected
+}
+
+function getTodayDay(weekStartStr) {
+  if (!weekStartStr) return 1;
+  const start = new Date(weekStartStr + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const diff = Math.floor((today - start) / 86400000);
+  return Math.min(Math.max(diff + 1, 1), 6);
+}
+
+function showToast(msg, type) {
+  let t = document.getElementById('_toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);padding:10px 18px;border-radius:30px;font-size:13px;font-weight:600;opacity:0;transition:all 0.3s;z-index:9999;white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = type === 'error' ? '#EF4444' : type === 'warn' ? '#F59E0B' : '#0F172A';
+  t.style.color = '#fff';
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 2800);
+}
+
+
+
+// ── Auto-fill audit score for OIC's outlet ───────────────────────────────────
+function getLatestAuditForOutlet(outlet) {
+  if (!outlet) return null;
+  try {
+    const db = JSON.parse(localStorage.getItem('OIC_SHARED_DB_V2') || '{}');
+    const audits = db.audits || [];
+    const outletAudits = audits.filter(a =>
+      a.outlet && a.outlet.trim().toLowerCase() === outlet.trim().toLowerCase()
+    );
+    if (outletAudits.length === 0) return null;
+    // Get most recent
+    return outletAudits.sort((a,b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
+  } catch(e) { return null; }
+}
+
+function showAuditBanner() {
+  const outlet = document.getElementById('fOutlet')?.value?.trim();
+  const audit = getLatestAuditForOutlet(outlet);
+  let banner = document.getElementById('_auditBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = '_auditBanner';
+    banner.style.cssText = 'margin:10px 16px 0;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:600;';
+    const content = document.getElementById('mainContent');
+    if (content) content.parentNode.insertBefore(banner, content);
+  }
+  if (!outlet) {
+    banner.style.display = 'none';
+    return;
+  }
+  if (!audit) {
+    banner.style.cssText += 'background:#FEF9C3;border:1px solid #FDE68A;color:#92400E;display:block;';
+    banner.textContent = '⏳ ' + outlet + ' — No audit submitted yet (Pending)';
+  } else {
+    const pass = audit.score >= 80;
+    banner.style.cssText += (pass
+      ? 'background:#DCFCE7;border:1px solid #22C55E;color:#0F766E;display:block;'
+      : 'background:#FEE2E2;border:1px solid #EF4444;color:#B91C1C;display:block;');
+    const d = new Date(audit.submittedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+    banner.textContent = (pass ? '✅' : '❌') + ' ' + outlet + ' ' + audit.auditType +
+      ' Audit: ' + audit.score + '% (' + audit.rawScore + '/' + audit.maxScore + ' pts)' +
+      ' — Auditor: ' + audit.auditor + ' — ' + d;
+    // Also auto-set the auditor section task yn if score >= 80
+    autoSetAuditorTask(audit.score);
+  }
+}
+
+function autoSetAuditorTask(score) {
+  // Find the aud1 task and auto-set it
+  const val = score >= 80 ? 'yes' : 'no';
+  setVal(currentDay, 'aud1', 'yn', val);
+}
+
+
+// ── Auto-reset: detect new week and start fresh cycle ────────
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  // Sunday (0) = day 7 of current week, go back 6 days to Monday
+  // Monday (1) = day 1, no change
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+
+// ── Dubai Time (UTC+4) — defined first ───────────────────────
+function getDubaiDate() {
+  const now = new Date();
+  const dubaiOffset = 4 * 60;
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc + (dubaiOffset * 60000));
+}
+function getDubaiDateStr() {
+  const d = getDubaiDate();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function getDubaiHour() { return getDubaiDate().getHours(); }
+// ─────────────────────────────────────────────────────────────
+function getCurrentWeekStart() {
+  return getDubaiDateStr(); // Always Dubai date
+}
+
+function checkAutoReset() {
+  const weekField = document.getElementById('fWeek');
+  if (!weekField) return;
+  // Always force today's Dubai date
+  const dubaiToday = getDubaiDateStr();
+  weekField.value = dubaiToday;
+  localStorage.setItem('kic_info_' + ROLE + '_fWeek', dubaiToday);
+  // Set SK per staff name on load
+  const savedName = localStorage.getItem('kic_info_' + ROLE + '_fName') || '';
+  if (savedName) SK = SK_BASE + '_' + savedName.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+
+  buildDayRail();
+  renderDay();
+}
+
+
+// ── Role config ───────────────────────────────────────────────
+const ROLE       = 'oic';
+
+function clearTodayData() {
+  if (!confirm("Clear today's answers and photos?\n\nYour name and outlet will be kept.\nThis cannot be undone.")) return;
+  const d = load();
+  const todayKey = getTodayKey();
+  if (d[todayKey]) { delete d[todayKey]; save(d); }
+  currentShift = null;
+  try { localStorage.removeItem('oic_currentShift_' + getTodayKey()); } catch(e) {}
+  showToast("Today's checklist cleared ✓", 'ok');
+  if (typeof buildDayRail === 'function') buildDayRail(); renderDay();
+}
+
+function clearAllData() {
+  const pin = prompt('Enter Training PIN to reset checklist:');
+  if (pin === null) return;
+  if (pin !== 'TRAIN2025') { showToast('Incorrect PIN — reset not allowed 🔒', 'error'); return; }
+  if (!confirm('Clear ALL checklist data for this week? This cannot be undone.')) return;
+  localStorage.removeItem(SK);
+  showToast('Data cleared — fresh start ✓', 'ok');
+  buildDayRail(); renderDay();
+}
+const ROLE_LABEL = 'OIC';
+const SK_BASE         = 'kic_oic_data_v2'
+let SK           = SK_BASE;
+const ALLOW_OVERWRITE = false; // Lock after submit — overwrite via dashboard only
+let _overwritePins = {};
+function loadOverwritePins() {
+  if (!_db) return;
+  _db.ref('settings/pins').once('value', snap => {
+    _overwritePins = snap.val() || {};
+  });
+}
+function checkOverwritePin(code) {
+  const validRoles = ['oic','areamanager','training','operations','director','ceo'];
+  return validRoles.some(r => _overwritePins[r] && _overwritePins[r] === code);
+}
+
+const SECTIONS = [
+  // ── OIC fills: Opening shift only ───────────────────────────
+  {
+    title: '🌅 Opening Today',
+    shift: 'opening',
+    tasks: [
+      { id:'o1', owner:'self', ownerLbl:'Self-report', text:'Line check conducted across all fronts‑of‑house sections, including Stations, Cashier, Bar, and Dining Area.', photo:true, translations:{} },
+      { id:'o2', owner:'self', ownerLbl:'Self-report', text:'FOH Inventory Check: operating supplies, printed menus, promo collateral, bar stock level — all verified.', photo:true, translations:{} },
+      { id:'o3', owner:'self', ownerLbl:'Self-report', text:'Equipment Check: POS, AC units, music system, lighting, bar equipment — all functioning properly.', photo:true, translations:{} },
+      { id:'o4', owner:'self', ownerLbl:'Self-report', text:'Service Team Briefing conducted, covering grooming checks, target allocation, constructive points, and team motivation.', photo:true, translations:{} }
+    ]
+  },
+
+  // ── OIC fills: Closing shift only ───────────────────────────
+  {
+    title: '🌙 Closing Shift',
+    shift: 'closing',
+    tasks: [
+      { id:'c1', owner:'self', ownerLbl:'Self-report', text:'Line check conducted across all FOH sections, including side stations, outdoor setup, and clean‑and‑reset areas.', photo:true, translations:{} },
+      { id:'c2', owner:'self', ownerLbl:'Self-report', text:'All closing side‑duties were completed, POS settlement was fully reconciled, and the cash drop was secured without any variance.', photo:true, translations:{} },
+      { id:'c3', owner:'self', ownerLbl:'Self-report', text:'FOH equipment check conducted to ensure all systems were switched off safely and any maintenance issues were reported.', photo:true, translations:{} },
+      { id:'c4', owner:'self', ownerLbl:'Self-report', text:'The handover book was filled for the co-OIC, the notice board was updated for the next day briefing, and all bags were checked before staff left the restaurant and properly recorded.', photo:true, translations:{} }
+    ]
+  },
+
+  // ── Area Manager Evaluation (locked for OIC — shown in both shifts as read-only) ──
+  {
+    title: '⭐ Service & Quality Standards',
+    evalOnly: true,
+    tasks: [
+      { id:'s1', owner:'areamanager', ownerLbl:'Area Manager', text:'Does the OIC actively manage the floor to ensure the sequence of service, guest interaction, hygiene, and brand compliance are consistently upheld?', photo:false, translations:{} }
+    ]
+  },
+  {
+    title: '🎯 Shift Control & Team Leadership',
+    evalOnly: true,
+    tasks: [
+      { id:'m1', owner:'areamanager', ownerLbl:'Area Manager', text:'Does the OIC lead by example, delegating tasks effectively, maintaining high staff morale, and ensuring all FOH checklists are submitted on time?', photo:false, translations:{} }
+    ]
+  },
+  {
+    title: '👀 Floor Presence & Accountability',
+    evalOnly: true,
+    tasks: [
+      { id:'p1', owner:'areamanager', ownerLbl:'Area Manager', text:'Is the OIC highly visible on the floor, holding FOH staff accountable for their performance, and executing opening/closing duties correctly?', photo:false, translations:{} }
+    ]
+  },
+  {
+    title: '💰 Revenue Drive & Coaching',
+    evalOnly: true,
+    tasks: [
+      { id:'u1', owner:'areamanager', ownerLbl:'Area Manager', text:'Is the OIC aware of daily sales targets, and do they actively coach/monitor the team on upselling techniques to drive results?', photo:false, translations:{} }
+    ]
+  },
+  {
+    title: '🚨 Incident Resolution & Escalation',
+    evalOnly: true,
+    tasks: [
+      { id:'w1', owner:'areamanager', ownerLbl:'Area Manager', text:'Does the OIC handle staff/guest conflicts calmly on the spot and ensure any major incidents or complaints are reported to you promptly?', photo:false, translations:{} }
+    ]
+  },
+  {
+    title: '📅 Attendance & Punctuality',
+    evalOnly: true,
+    tasks: [
+      { id:'mp1', owner:'areamanager', ownerLbl:'Area Manager', text:'Did the OIC arrive on time, complete their full shift, and adhere strictly to the schedule without deviation?', photo:false, translations:{} }
+    ]
+  }
+];
+let currentDay = 1; // Single daily submission — day rail removed
+let currentShift = null; // 'opening' or 'closing' — null shows shift picker
+let activePhotoTask = null;
+
+// ── Storage ───────────────────────────────────────────────────
+function load() { try { return JSON.parse(localStorage.getItem(SK))||{}; } catch(e) { return {}; } }
+
+function _stripBase64(d) {
+  try {
+    var clean = JSON.parse(JSON.stringify(d));
+    Object.keys(clean).forEach(function(dk) {
+      if (!clean[dk] || typeof clean[dk] !== 'object') return;
+      Object.keys(clean[dk]).forEach(function(tk) {
+        var task = clean[dk][tk];
+        if (!task || typeof task !== 'object') return;
+        // Only strip base64 if a Cloudinary URL already exists for that slot
+        ['photo','photo_1','photo_2','photo_3','photo_4','photo_5',
+         'photo_6','photo_7','photo_8','photo_9'].forEach(function(pk) {
+          var urlKey = pk === 'photo' ? 'photoUrl' : pk.replace('photo_','photoUrl_');
+          var hasCloudUrl = task[urlKey] && task[urlKey].startsWith('http');
+          if (hasCloudUrl && task[pk] && typeof task[pk] === 'string' && task[pk].startsWith('data:'))
+            delete task[pk];
+        });
+      });
+    });
+    return clean;
+  } catch(e) { return d; }
+}
+
+function save(d) { try { localStorage.setItem(SK, JSON.stringify(_stripBase64(d))); } catch(e) { showToast('Storage full — clear browser data','error'); } }
+
+// ── Track Submitted Dates (for weekly attendance/eligibility) ──
+function trackSubmittedDate(weekStart) {
+  try {
+    const d = load();
+    if (!d._submittedDates) d._submittedDates = {};
+    if (!d._submittedDates[weekStart]) d._submittedDates[weekStart] = [];
+    const todayDateStr = getTodayKey().replace('dt', '');
+    if (!d._submittedDates[weekStart].includes(todayDateStr)) {
+      d._submittedDates[weekStart].push(todayDateStr);
+    }
+    save(d);
+    return d._submittedDates[weekStart];
+  } catch(e) { return []; }
+}
+function getTodayKey() {
+  // Closing shift after midnight (12AM–2AM) belongs to previous day
+  try {
+    const hour = getDubaiHour();
+    if (currentShift === 'closing' && hour < 2) {
+      const d = getDubaiDate();
+      d.setDate(d.getDate() - 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return 'dt' + y + '-' + m + '-' + dd;
+    }
+  } catch(e) {}
+  return 'dt' + getDubaiDateStr(); // Dubai date key
+}
+
+// ── Purge stale data older than today ────────────────────────
+function purgeOldData() {
+  try {
+    const today = getDubaiDateStr();
+    const d = load();
+    let cleaned = false;
+    Object.keys(d).forEach(key => {
+      // Only remove old date-based keys older than 7 days — keep d1-d6 for compatibility
+      if (/^dt\d{4}-\d{2}-\d{2}$/.test(key) && key !== 'dt' + today) {
+        const diff = (new Date(today) - new Date(key.replace('dt',''))) / (1000*60*60*24);
+        if (diff > 7) { delete d[key]; cleaned = true; }
+      }
+    });
+    if (cleaned) save(d);
+  } catch(e) {}
+}
+
+// ── Check Firebase reset flag ─────────────────────────────────
+function checkResetFlag() {
+  if (!_db) return; // Don't retry — only check when explicitly called with staff name
+  const role   = ROLE;
+  const outlet = (getOutlet ? getOutlet() : '') || '';
+  const name   = (getStaffName ? getStaffName() : '') || '';
+  // Require name and outlet before checking — avoids false resets on load
+  if (!name || !outlet) return;
+  // Only check specific key for this exact staff+outlet — not global role key
+  const key = role + '_' + outlet.replace(/[^a-zA-Z0-9]/g,'_') + '_' + name.replace(/[^a-zA-Z0-9]/g,'_');
+  _db.ref('reset_flags/' + key).once('value', snap => {
+    if (!snap.exists()) return;
+    const flag = snap.val();
+    if (!flag || !flag.resetAt) return;
+    const d = load();
+    const lastCheck = d._lastResetCheck || '2000-01-01';
+    if (flag.resetAt <= lastCheck) return; // Already processed
+    // Clear local data
+    localStorage.removeItem(SK);
+    const fresh = { _lastResetCheck: flag.resetAt };
+    save(fresh);
+    showToast('Checklist reset by Admin ✓', 'ok');
+    if (typeof renderDay === 'function') renderDay();
+    if (typeof buildDayRail === 'function') buildDayRail();
+  });
+}
+function getVal(day,tid,field) {
+  const data = load();
+  const dateKey = getTodayKey();
+  return data[dateKey]?.[tid]?.[field] || data['d'+day]?.[tid]?.[field] || null;
+}
+
+function getValByDate(dateStr,tid,field) {
+  try {
+    const data = load();
+    return data['dt'+dateStr]?.[tid]?.[field] || null;
+  } catch(e) { return null; }
+}
+function setVal(day,tid,field,val) {
+  const d=load();
+  const key = getTodayKey(); // Use today's date as key
+  if(!d[key]) d[key]={};
+  if(!d[key][tid]) d[key][tid]={};
+  d[key][tid][field]=val;
+  save(d);
+}
+
+
+// ── Dubai Time (UTC+4) ────────────────────────────────────────
+function getDubaiDate() {
+  const now = new Date();
+  const dubaiStr = now.toLocaleString('en-CA', {timeZone:'Asia/Dubai', hour12:false,
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  return new Date(dubaiStr.replace(',',''));
+}
+function getDubaiDateStr() {
+  const d = getDubaiDate();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + dd;
+}
+function getDubaiHour() {
+  return getDubaiDate().getHours();
+}
+// ── Single source of truth for "which day" (2026-07-02) ────────────────
+// Called ONCE, at the moment of submission (Opening or Closing). Every
+// report in the dashboard trusts this stamped value rather than
+// recalculating it independently, so they can never disagree again.
+// Closing shifts submitted 12am-2am Dubai time belong to the PREVIOUS
+// operational day; everything else is simply today.
+function getBusinessDate(shiftType) {
+  const _h = getDubaiHour();
+  const _isLateClosing = shiftType === 'closing' && _h < 2;
+  const _bd = new Date(_isLateClosing ? Date.now() - 86400000 : Date.now());
+  return _bd.toLocaleDateString('en-CA', {timeZone: 'Asia/Dubai'});
+}
+
+function getWeekStartFromDate(dubaiDateStr) {
+  try {
+    const parts = dubaiDateStr.split('-');
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+    const dow = d.getDay();
+    const diff = (dow === 0) ? -6 : 1 - dow;
+    d.setDate(d.getDate() + diff);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  } catch(e) { return null; }
+}
+function getWeekStart() {
+  // Always compute Monday of current Dubai week — never return today's date as the week
+  try {
+    const dubaiStr = getDubaiDateStr(); // YYYY-MM-DD
+    const parts = dubaiStr.split('-');
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+    const dow = d.getDay(); // 0=Sun, 1=Mon...
+    const diff = (dow === 0) ? -6 : 1 - dow; // days back to Monday
+    d.setDate(d.getDate() + diff);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  } catch(e) { return getDubaiDateStr(); }
+}
+function toTitleCase(str) {
+  return str.replace(/\w\S*/g, function(txt) { return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase(); });
+}
+function getStaffName() { return toTitleCase(document.getElementById('fName').value.trim()); }
+function getOutlet() { return document.getElementById('fOutlet').value.trim(); }
+function getVerified() { return ''; }
+
+// ── Day rail ──────────────────────────────────────────────────
+function selectShift(shift) {
+  const dayKey = getTodayKey();
+  const data = load();
+  const openingDone = !!data[dayKey]?._openDone;
+  const closingDone = !!data[dayKey]?._closeDone;
+  const nowH = getDubaiHour();
+  const openingOpen = nowH >= 7 && nowH < 14;
+  const closingOpen = nowH >= 14 || nowH < 2;
+  if (shift === 'opening' && !openingOpen && !openingDone) {
+    showToast('Opening shift is only available 7:00 AM \u2013 2:00 PM', 'warn'); return;
+  }
+  if (shift === 'closing' && !closingOpen && !closingDone) {
+    showToast('Closing shift is only available 2:00 PM \u2013 2:00 AM', 'warn'); return;
+  }
+  currentShift = shift;
+  // Persist so renderDay() after photo upload doesn't lose shift context
+  try { localStorage.setItem('oic_currentShift_' + getTodayKey(), shift); } catch(e) {}
+  renderDay();
+}
+
+function tapYN(tid, val, el) {
+  const dayKey = getTodayKey();
+  const data = load();
+  const openingDone = !!data[dayKey]?._openDone;
+  const closingDone = !!data[dayKey]?._closeDone;
+  const isSubmitted = currentShift === 'opening' ? openingDone : closingDone;
+  if (isSubmitted && !ALLOW_OVERWRITE) {
+    showToast('Already submitted \u2014 cannot edit \U0001f512', 'error'); return;
+  }
+  setVal(currentDay, tid, 'yn', val);
+  el.closest('.yn-row').querySelectorAll('.yn').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
+  const shiftSections = SECTIONS.filter(s => s.shift === currentShift);
+  let t = 0, y = 0;
+  let oY2=0,oM2=0,cY2=0,cM2=0;
+  const _td = load()[dayKey] || {};
+  shiftSections.forEach(s => s.tasks.forEach(tk => {
+    const v = _td[tk.id]?.yn;
+    if (v && v !== 'na') { t++; if (v === 'yes') y++; }
+  }));
+  SECTIONS.filter(s=>s.shift==='opening').forEach(s=>s.tasks.forEach(tk=>{
+    const v=_td[tk.id]?.yn; if(v&&v!=='na'){oM2++;if(v==='yes')oY2++;}
+  }));
+  SECTIONS.filter(s=>s.shift==='closing').forEach(s=>s.tasks.forEach(tk=>{
+    const v=_td[tk.id]?.yn; if(v&&v!=='na'){cM2++;if(v==='yes')cY2++;}
+  }));
+  const pct = t > 0 ? Math.round((y / t) * 100) : 0;
+  const oPct2 = oM2>0?Math.round((oY2/oM2)*100):null;
+  const cPct2 = cM2>0?Math.round((cY2/cM2)*100):null;
+  // Update score bar
+  const fill = document.getElementById('scoreFill');
+  const lbl  = document.getElementById('scorePct');
+  if (fill) { fill.style.width = pct + '%'; fill.style.background = pct>=95?'#22C55E':pct>=75?'#F59E0B':'#EF4444'; }
+  if (lbl)  { lbl.textContent = pct + '%'; }
+  // Update score boxes live
+  const pFg2=v=>v==null?'#94A3B8':v>=95?'#15803D':'#B45309';
+  const oBox=document.getElementById('oScoreBox');
+  const cBox=document.getElementById('cScoreBox');
+  const totBox=document.getElementById('totScoreBox');
+  if(oBox){ oBox.textContent=oPct2!=null?oPct2+'%':'—'; oBox.style.color=pFg2(oPct2); }
+  if(cBox){ cBox.textContent=cPct2!=null?cPct2+'%':'—'; cBox.style.color=pFg2(cPct2); }
+  if(totBox){
+    const avail3=[oPct2,cPct2].filter(v=>v!=null);
+    const tot3=avail3.length?Math.round(avail3.reduce((a,b)=>a+b,0)/avail3.length):null;
+    totBox.textContent=tot3!=null?tot3+'%':'—';
+    totBox.style.color=tot3!=null?'#fff':'#94A3B8';
+  }
+  // Comment box — always shown in task template
+}
+
+function buildDayRail() {} // Day rail removed — single daily submission
+
+// ── Render day ────────────────────────────────────────────────
+function renderDay() {
+  // MASTER-BUILD: Shift restore — survives ALL page reload paths
+  if (!currentShift) {
+    var _rs = localStorage.getItem('oic_currentShift_' + getTodayKey());
+    if (_rs === 'opening' || _rs === 'closing') currentShift = _rs;
+  }
+  // Always restore currentShift first — permanent fix
+  if (!currentShift) {
+    var _rs = localStorage.getItem('oic_currentShift_' + getTodayKey());
+    if (_rs === 'opening' || _rs === 'closing') currentShift = _rs;
+  }
+  const container = document.getElementById('mainContent');
+  container.innerHTML = '';
+
+  const dayKey = getTodayKey();
+  const data = load();
+  if (!data[dayKey]) { data[dayKey] = {}; save(data); }
+
+  const openingDone = !!data[dayKey]?._openDone;
+  const closingDone = !!data[dayKey]?._closeDone;
+  const nowH = getDubaiHour();
+  const openingOpen = nowH >= 7 && nowH < 14;
+  const closingOpen = nowH >= 14 || nowH < 2;
+
+  // ── Shift picker ──────────────────────────────────────────────
+  if (!currentShift) {
+    const screen = document.createElement('div');
+    screen.style.cssText = 'padding:24px 16px;text-align:center;';
+    const minsLeft = openingOpen ? 0 : (14 - nowH - 1) * 60 + (60 - new Date().getMinutes());
+
+    const openStyle = (openingOpen || openingDone)
+      ? 'display:block;width:100%;padding:18px;border-radius:14px;border:none;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;background:linear-gradient(135deg,#7B2D42,#C4533A);color:#fff;'
+      : 'display:block;width:100%;padding:18px;border-radius:14px;border:none;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:4px;background:#E2E8F0;color:#94A3B8;';
+    const openNote = (!openingOpen && !openingDone)
+      ? '<div style="font-size:11px;color:#94A3B8;margin-top:4px;margin-bottom:12px;">Opening shift available 7:00 AM \u2013 2:00 PM only \u{1f550}</div>' : '';
+
+    const closeStyle = (closingOpen || closingDone)
+      ? 'display:block;width:100%;padding:18px;border-radius:14px;border:none;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:4px;background:linear-gradient(135deg,#1A4740,#0D9488);color:#fff;'
+      : 'display:block;width:100%;padding:18px;border-radius:14px;border:none;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:4px;background:#E2E8F0;color:#94A3B8;';
+    const closeNote = (!closingOpen && !closingDone)
+      ? '<div style="font-size:11px;color:#94A3B8;margin-top:4px;">Opening at 2:00 PM until 2:00 AM</div>'
+      : (closingOpen && !closingDone ? '<div style="font-size:11px;color:#0F766E;margin-top:4px;">\u2713 Available now</div>' : '');
+
+    screen.innerHTML = `
+      <div style="font-size:32px;margin-bottom:8px;">\u{1f44b}</div>
+      <h2 style="font-size:16px;font-weight:700;color:#7B2D42;margin-bottom:6px;">Which shift are you on?</h2>
+      <p style="font-size:13px;color:#64748B;margin-bottom:20px;">Tap your shift to load the correct tasks</p>
+      <button onclick="selectShift('opening')" style="${openStyle}">\u{1f305} Opening Shift ${openingDone ? '\u2713' : ''}</button>
+      ${openNote}
+      <button onclick="selectShift('closing')" style="${closeStyle}">\u{1f319} Closing Shift ${closingDone ? '\u2713' : ''}</button>
+      ${closeNote}
+    `;
+    container.appendChild(screen);
+    return;
+  }
+
+  // ── Back button + Clear shift button ─────────────────────────
+  const backBtn = document.createElement('button');
+  backBtn.style.cssText = 'display:flex;align-items:center;gap:6px;margin:12px 16px 0;padding:6px 12px;border:1.5px solid #E0DDD4;border-radius:20px;font-size:12px;font-weight:600;color:#7B2D42;background:#fff;cursor:pointer;';
+  backBtn.innerHTML = '\u2190 Change Shift';
+  backBtn.onclick = () => {
+    currentShift = null;
+    try { localStorage.removeItem('oic_currentShift_' + getTodayKey()); } catch(e) {}
+    renderDay();
+  };
+
+  const clearBtn = document.createElement('button');
+  clearBtn.style.cssText = 'display:flex;align-items:center;gap:6px;margin:12px 8px 0 0;padding:6px 12px;border:1.5px solid #FCA5A5;border-radius:20px;font-size:12px;font-weight:600;color:#B91C1C;background:#FFF1F0;cursor:pointer;';
+  clearBtn.innerHTML = '🗑 Clear ' + (currentShift === 'opening' ? 'Opening' : 'Closing');
+  clearBtn.onclick = () => {
+    if (!confirm('Clear all ' + (currentShift === 'opening' ? 'opening' : 'closing') + ' shift answers and photos? This cannot be undone.')) return;
+    const d = load();
+    const dayKey = getTodayKey();
+    if (d[dayKey]) {
+      // Clear only tasks for current shift
+      const shiftTaskIds = SECTIONS.filter(s => s.shift === currentShift).flatMap(s => s.tasks.map(t => t.id));
+      shiftTaskIds.forEach(tid => { delete d[dayKey][tid]; });
+      // Clear shift-done flag
+      if (currentShift === 'opening') delete d[dayKey]._openDone;
+      else delete d[dayKey]._closeDone;
+      save(d);
+    }
+    showToast((currentShift === 'opening' ? 'Opening' : 'Closing') + ' shift cleared \u2713', 'ok');
+    renderDay();
+  };
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;align-items:center;flex-wrap:wrap;';
+  btnRow.appendChild(backBtn);
+  btnRow.appendChild(clearBtn);
+  container.appendChild(btnRow);
+
+  const isSubmitted = currentShift === 'opening' ? openingDone : closingDone;
+
+  // Score: Opening+Eval / Closing+Eval / Opening+Closing+Eval
+  const _allTd = data[dayKey] || {};
+  let oY=0,oM=0,cY=0,cM=0;
+  SECTIONS.filter(s=>s.shift==='opening').forEach(s=>s.tasks.forEach(t=>{
+    const v=_allTd[t.id]?.yn; if(v&&v!=='na'){oM++;if(v==='yes')oY++;}
+  }));
+  SECTIONS.filter(s=>s.shift==='closing').forEach(s=>s.tasks.forEach(t=>{
+    const v=_allTd[t.id]?.yn; if(v&&v!=='na'){cM++;if(v==='yes')cY++;}
+  }));
+  const shiftSec=SECTIONS.filter(s=>s.shift===currentShift);
+  let t=0,y=0;
+  shiftSec.forEach(s=>s.tasks.forEach(tk=>{
+    const v=_allTd[tk.id]?.yn; if(v&&v!=='na'){t++;if(v==='yes')y++;}
+  }));
+  const pct=t>0?Math.round((y/t)*100):0;
+  const oPct=oM>0?Math.round((oY/oM)*100):null;
+  const cPct=cM>0?Math.round((cY/cM)*100):null;
+  const pBg=v=>v==null?'#F8FAFC':v>=95?'#F0FDF4':'#FFF7ED';
+  const pBd=v=>v==null?'#E2E8F0':v>=95?'#BBF7D0':'#FED7AA';
+  const pFg=v=>v==null?'#94A3B8':v>=95?'#15803D':'#B45309';
+  const showClosing=closingDone||(currentShift==='closing');
+  const parts2=[];
+  if(oPct!=null||currentShift==='opening') parts2.push('Opening');
+  if(showClosing) parts2.push('Closing');
+  parts2.push('Evaluation');
+  const fLabel=parts2.join(' + ')+' = Total';
+  const avail2=[oPct,showClosing?cPct:null].filter(v=>v!=null);
+  const totPct=avail2.length?Math.round(avail2.reduce((a,b)=>a+b,0)/avail2.length):null;
+  const cols2=showClosing?'repeat(4,1fr)':'repeat(3,1fr)';
+  const scoreCard=document.createElement('div');
+  scoreCard.style.cssText='margin:10px 16px;';
+  scoreCard.innerHTML=
+    '<div style="font-size:10px;font-weight:700;color:#64748B;letter-spacing:.04em;margin-bottom:6px;">'+fLabel+'</div>'
+   +'<div id="scoreBoxes" style="display:grid;grid-template-columns:'+cols2+';gap:5px;">'
+   +'<div style="background:'+pBg(oPct)+';border:1.5px solid '+pBd(oPct)+';border-radius:10px;padding:7px;text-align:center;">'
+   +'<div style="font-size:9px;font-weight:700;color:#64748B;text-transform:uppercase;">Opening</div>'
+   +'<div id="oScoreBox" style="font-size:17px;font-weight:700;color:'+pFg(oPct)+'">'+(oPct!=null?oPct+'%':'&mdash;')+'</div>'
+   +'<div style="font-size:9px;color:#94A3B8;">'+(openingDone?'Done':'Live')+'</div></div>'
+   +(showClosing
+     ?'<div style="background:'+pBg(cPct)+';border:1.5px solid '+pBd(cPct)+';border-radius:10px;padding:7px;text-align:center;">'
+      +'<div style="font-size:9px;font-weight:700;color:#64748B;text-transform:uppercase;">Closing</div>'
+      +'<div id="cScoreBox" style="font-size:17px;font-weight:700;color:'+pFg(cPct)+'">'+(cPct!=null?cPct+'%':'&mdash;')+'</div>'
+      +'<div style="font-size:9px;color:#94A3B8;">'+(closingDone?'Done':'Live')+'</div></div>'
+     :'')
+   +'<div style="background:#EFF6FF;border:1.5px dashed #BFDBFE;border-radius:10px;padding:7px;text-align:center;">'
+   +'<div style="font-size:9px;font-weight:700;color:#1E40AF;text-transform:uppercase;">Eval</div>'
+   +'<div style="font-size:17px;font-weight:700;color:#94A3B8;">&mdash;</div>'
+   +'<div style="font-size:9px;color:#94A3B8;">By AM</div></div>'
+   +'<div style="background:'+(totPct!=null?'#1A3C5E':'#F8FAFC')+';border:1.5px solid '+(totPct!=null?'#1A3C5E':'#E2E8F0')+';border-radius:10px;padding:7px;text-align:center;">'
+   +'<div style="font-size:9px;font-weight:700;color:'+(totPct!=null?'rgba(255,255,255,.7)':'#64748B')+';text-transform:uppercase;">Total</div>'
+   +'<div id="totScoreBox" style="font-size:17px;font-weight:700;color:'+(totPct!=null?'#fff':'#94A3B8')+'">'+(totPct!=null?totPct+'%':'&mdash;')+'</div>'
+   +'<div style="font-size:9px;color:'+(totPct!=null?'rgba(255,255,255,.6)':'#94A3B8')+'">'+(totPct!=null?(totPct>=95?'Pass':'<95%'):'')+'</div></div>'
+   +'</div>';
+  container.appendChild(scoreCard);
+
+  // Live score bar for current shift
+  const scoreBarEl=document.createElement('div');
+  scoreBarEl.style.cssText='margin:6px 16px 4px;';
+  scoreBarEl.innerHTML='<div style="font-size:10px;color:#64748B;margin-bottom:3px;">'+(currentShift==='opening'?'Opening':'Closing')+' progress</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<div style="flex:1;height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">'
+    +'<div id="scoreFill" style="height:100%;width:'+pct+'%;background:'+(pct>=95?'#22C55E':pct>=75?'#F59E0B':'#EF4444')+';border-radius:3px;transition:width 0.3s;"></div></div>'
+    +'<span id="scorePct" style="font-size:12px;font-weight:700;color:#7C2D12;min-width:36px;">'+pct+'%</span></div>';
+  container.appendChild(scoreBarEl);
+
+  // ── Lock banner if submitted ──────────────────────────────────
+  if (isSubmitted && !ALLOW_OVERWRITE) {
+    const lockBanner = document.createElement('div');
+    lockBanner.style.cssText = 'margin:0 16px 10px;padding:10px 14px;background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;font-size:12px;color:#15803D;font-weight:600;text-align:center;';
+    lockBanner.innerHTML = '\u2705 ' + (currentShift === 'opening' ? 'Opening' : 'Closing') + ' submitted \u2014 view only';
+    container.appendChild(lockBanner);
+  }
+
+  // ── OIC shift tasks (self-fillable) ───────────────────────────
+  shiftSec.forEach(section => {
+    const hdr = document.createElement('div');
+    hdr.className = 'section-hdr';
+    hdr.textContent = section.title;
+    container.appendChild(hdr);
+
+    section.tasks.forEach(task => {
+      const val = _allTd[task.id]?.yn;
+      const comment = _allTd[task.id]?.comment || '';
+      const locked = isSubmitted && !ALLOW_OVERWRITE;
+      const photos = (() => {
+        const urls = [], td2 = _allTd[task.id] || {};
+        // Check Cloudinary URL slots first (photo_url, photo_1_url...)
+        // then fall back to local base64 (photo, photo_1...) for instant display
+        const slots = [['photo_url','photo'], ['photo_1_url','photo_1'], ['photo_2_url','photo_2'], ['photo_3_url','photo_3'], ['photo_4_url','photo_4'], ['photo_5_url','photo_5'], ['photo_6_url','photo_6'], ['photo_7_url','photo_7'], ['photo_8_url','photo_8'], ['photo_9_url','photo_9']];
+        slots.forEach(([urlKey, b64Key]) => {
+          const url = td2[urlKey] || td2[urlKey.replace('_url','Url')] || td2['photoUrl'] || '';
+          const b64 = td2[b64Key] || '';
+          const best = (url && url.startsWith('http')) ? url : (b64 && b64.startsWith('data:')) ? b64 : null;
+          if (best && !urls.includes(best)) urls.push(best);
+        });
+        // Also check legacy photoUrl field
+        if (td2.photoUrl && !urls.includes(td2.photoUrl)) urls.push(td2.photoUrl);
+        return urls.filter(Boolean);
+      })();
+
+      const card = document.createElement('div');
+      card.className = 'task-card' + (locked ? ' locked-card' : '');
+      card.innerHTML = `
+        <div class="task-top">
+          <span class="owner-tag ot-self">${task.ownerLbl}</span>
+          <span class="task-text">${task.text}</span>
+        </div>
+        <div class="yn-row">
+          <div class="yn yes ${val==='yes'?'on':''}" onclick="tapYN('${task.id}','yes',this)">\u2713 YES</div>
+          <div class="yn no ${val==='no'?'on':''}" onclick="tapYN('${task.id}','no',this)">\u2717 NO</div>
+          <div class="yn na ${val==='na'?'on':''}" onclick="tapYN('${task.id}','na',this)">N/A</div>
+          ${task.photo ? ('<button class="photo-btn '+(photos.length?'taken':'')+'" onclick="openPhotoModal(\''+task.id+'\')">'+(photos.length?'\u{1f4f7} \u2713':'\u{1f4f7}')+'</button>') : ''}
+        </div>
+        <div class="comment-row" style="padding:4px 0 2px 0;"><div style="font-size:10px;color:#94A3B8;text-transform:uppercase;font-weight:600;margin-bottom:3px;">Comment</div><textarea rows="2" placeholder="Add comment..." onchange="setVal(${currentDay},'${task.id}','comment',this.value)" style="width:100%;padding:6px;border:1px solid #E0DDD4;border-radius:6px;font-size:12px;resize:vertical;box-sizing:border-box;">${comment.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea></div>
+        ${photos.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;padding:6px 0;">${photos.map((u,pi)=>`<div style='display:inline-block;text-align:center;vertical-align:top;margin:2px;'><img src='${u}' style='display:block;width:60px;height:60px;object-fit:cover;border-radius:6px;border:2px solid #22C55E;cursor:zoom-in;' onclick='openLightbox(this.src)' title='Tap to zoom'><button onclick='removePhoto("'+task.id+'",${pi})' style='display:block;width:100%;margin-top:3px;padding:2px 4px;font-size:10px;font-weight:700;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:4px;color:#B91C1C;cursor:pointer;'>Delete</button></div>`).join('')}</div>`:''}
+      `;
+      container.appendChild(card);
+    });
+  });
+
+  // ── Area Manager evaluation notice (mirrors service.html OIC panel) ──────
+  const amPanel = document.createElement('div');
+  amPanel.style.cssText = 'margin:16px 0 8px;';
+  amPanel.innerHTML = '<div style="padding:14px;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#1E40AF;margin-bottom:4px;">📋 Area Manager Evaluation</div><div style="font-size:12px;color:#64748B;">This section is filled by the Area Manager from the<br><strong>Master Dashboard</strong> after you submit.</div></div>';
+  container.appendChild(amPanel);
+
+  // ── Submit button ─────────────────────────────────────────────
+  if (!isSubmitted) {
+    const btn = document.createElement('button');
+    btn.className = 'submit-btn';
+    btn.textContent = 'Submit ' + (currentShift === 'opening' ? 'Opening' : 'Closing') + ' Checklist';
+    btn.onclick = submitDay;
+    container.appendChild(btn);
+  }
+}
+
+function showRegistryRequestPrompt(typedName) {
+  if (document.getElementById('registryRequestOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'registryRequestOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:999998;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:14px;max-width:380px;width:100%;padding:24px;text-align:center;">' +
+      '<div style="font-size:36px;margin-bottom:10px;">📨</div>' +
+      '<div style="font-size:16px;font-weight:700;color:#1A3C5E;margin-bottom:8px;">Request to be Added</div>' +
+      '<div style="font-size:13px;color:#64748B;line-height:1.5;margin-bottom:18px;">"' + typedName + '" isn\'t in the staff registry yet. Send a request to your Training Manager so they can add you — you\'ll be able to submit as soon as it\'s approved.</div>' +
+      '<button onclick="sendRegistryRequest(\'' + typedName.replace(/'/g,"\\'") + '\')" id="sendRegRequestBtn" style="width:100%;padding:12px;background:#1A3C5E;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">Send Request</button>' +
+      '<button onclick="document.getElementById(\'registryRequestOverlay\').remove()" style="width:100%;padding:10px;background:transparent;color:#64748B;border:none;font-size:13px;cursor:pointer;">Cancel</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+function sendRegistryRequest(typedName) {
+  const btn = document.getElementById('sendRegRequestBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+  const outlet = (typeof getOutlet === 'function' ? getOutlet() : '') || '';
+  _db.ref('system/registryRequests').push({
+    name: typedName,
+    role: ROLE,
+    roleLabel: (typeof ROLE_LABEL !== 'undefined' ? ROLE_LABEL : ROLE),
+    outlet: outlet,
+    requestedAt: new Date().toISOString(),
+    status: 'pending'
+  }).then(() => {
+    const overlay = document.getElementById('registryRequestOverlay');
+    if (overlay) {
+      overlay.querySelector('div').innerHTML =
+        '<div style="font-size:36px;margin-bottom:10px;">✅</div>' +
+        '<div style="font-size:16px;font-weight:700;color:#1A3C5E;margin-bottom:8px;">Request Sent</div>' +
+        '<div style="font-size:13px;color:#64748B;line-height:1.5;margin-bottom:18px;">Your Training Manager has been notified. Please check back shortly, or ask your manager directly.</div>' +
+        '<button onclick="document.getElementById(\'registryRequestOverlay\').remove()" style="width:100%;padding:12px;background:#1A3C5E;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Close</button>';
+    }
+  }).catch(e => {
+    showToast('Failed to send request: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Request'; }
+  });
+}
+
+async function submitDay() {
+
+  // ── Final lock-check, right at the moment of submission ─────────────
+  try {
+    const _lockSnap = await _db.ref('system/checklistEnabled/' + ROLE).once('value');
+    if (_lockSnap.exists() && _lockSnap.val() === false) {
+      showToast('This checklist has been temporarily disabled. Please check with your Training Manager.', 'error');
+      showChecklistLockedScreen();
+      return;
+    }
+  } catch(e) { /* fail open on connectivity issues */ }
+
+  // ── Registry name validation (strict exact match) ──────────────────────
+  const _submitName = getStaffName ? getStaffName() : (document.getElementById('fName')?.value?.trim()||'');
+  const _nameResult = await validateStaffNameStrict(_submitName);
+  if (!_nameResult.ok) {
+    showToast('\u26A0 ' + _nameResult.msg, 'error');
+    const nameField = document.getElementById('fName');
+    if (nameField) { nameField.style.border = '2px solid #E53E3E'; nameField.focus(); }
+    if (_nameResult.reason === 'not_in_registry') {
+      showRegistryRequestPrompt(_submitName);
+    }
+    return;
+  }
+  // ── Duplicate submission check ──────────────────────────────────────────
+
+
+  const name = getStaffName();
+  const _vn = validateFullName(name);
+  if (!_vn.valid) { showToast(_vn.msg, 'warn'); document.getElementById('fName').focus(); return; }
+  if (!getOutlet()) { showToast('Please select an outlet', 'warn'); return; }
+  if (!currentShift) { showToast('Please select a shift first', 'warn'); return; }
+
+  SK = SK_BASE + '_' + name.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+
+  const shiftSections = SECTIONS.filter(s => s.shift === currentShift);
+  await waitForPhotoUploads(shiftSections.flatMap(s => s.tasks), 8000);
+  const _tdNow = load()[getTodayKey()] || {};
+  const unanswered = shiftSections.flatMap(s => s.tasks).filter(t => !_tdNow[t.id]?.yn);
+  if (unanswered.length) { showToast('Please answer all tasks before submitting', 'warn'); return; }
+  const missingComment = shiftSections.flatMap(s => s.tasks).filter(t => _tdNow[t.id]?.yn === 'no' && !(_tdNow[t.id]?.comment||'').trim());
+  if (missingComment.length) { showToast('Comment required for every NO answer', 'warn'); return; }
+
+  const d = load();
+  const dayKey = getTodayKey();
+  if (!d[dayKey]) d[dayKey] = {};
+  d[dayKey]._start = d[dayKey]._start || new Date().toISOString();
+  if (currentShift === 'opening') d[dayKey]._openDone = new Date().toISOString();
+  else d[dayKey]._closeDone = new Date().toISOString();
+  save(d);
+
+  // Score — current shift tasks only (not evalOnly)
+  let tY = 0, tM = 0;
+  shiftSections.forEach(s => s.tasks.forEach(t => {
+    const v = d[dayKey][t.id]?.yn;
+    if (v && v !== 'na') { tM++; if (v === 'yes') tY++; }
+  }));
+  const op = tM > 0 ? Math.round((tY / tM) * 100) : 0;
+
+  const outlet = getOutlet();
+  let weekStart = getWeekStart();
+  if (currentShift==='closing' && d[dayKey] && d[dayKey]._openDone) {
+    try { const _od=new Date(d[dayKey]._openDone).toLocaleDateString('en-CA',{timeZone:'Asia/Dubai'}); const _ow=getWeekStartFromDate(_od); if(_ow)weekStart=_ow; } catch(e){}
+  }
+
+  const _fbRecord = {
+    staffName:  name,
+    role:       ROLE,
+    roleLabel:  ROLE_LABEL,
+    outlet:     outlet,
+    week:       weekStart,
+    verifiedBy: getVerified(),
+    overallPct: op,
+    openingPct: currentShift === 'opening' ? op : null,
+    closingPct: currentShift === 'closing' ? op : null,
+    oicEvalPct: null,
+    qualified:  op >= 95,
+    day:        currentDay,
+    shift:      currentShift,
+    status:     currentShift === 'opening' ? 'opening_submitted' : 'closing_submitted',
+    startedAt:  d[dayKey]._start,
+    submittedAt: new Date().toISOString(),
+    lastUpdated: new Date().toISOString(),
+    businessDate: currentShift !== 'closing' ? null : getBusinessDate('closing'),
+    submittedDates: trackSubmittedDate(weekStart),
+    taskData: (function() {
+      const tasks = {};
+      // Save both shift tasks AND current evalOnly answers (if any from AM)
+      SECTIONS.forEach(s => s.tasks.forEach(t => {
+        const td = d[dayKey][t.id] || {};
+        const yn = td.yn;
+        const photoUrls = [];
+        // Collect Cloudinary URLs (http) AND base64 fallback
+        ['photo_url','photo_1_url','photo_2_url','photo_3_url','photo_4_url',
+         'photoUrl','photoUrl_1','photoUrl_2','photoUrl_3','photoUrl_4','photoUrl_5','photoUrl_6','photoUrl_7','photoUrl_8','photoUrl_9'].forEach(k => {
+          const u = td[k]; if (u && u.startsWith('http') && !photoUrls.includes(u)) photoUrls.push(u);
+        });
+        // If no Cloudinary URL yet, include base64 local photos so dashboard can display them
+        if (!photoUrls.length) {
+          ['photo','photo_1','photo_2','photo_3','photo_4','photo_5','photo_6','photo_7','photo_8','photo_9'].forEach(k => {
+            const u = td[k]; if (u && u.startsWith('data:') && !photoUrls.includes(u)) photoUrls.push(u);
+          });
+        }
+        const hasLocalPhoto = photoUrls.length > 0 || ['photo','photo_1','photo_2','photo_3','photo_4','photo_5','photo_6','photo_7','photo_8','photo_9'].some(k => {
+          const u = td[k]; return u && u.startsWith('data:');
+        });
+        if (yn || photoUrls.length || hasLocalPhoto) {
+          tasks[t.id] = { day: currentDay, section: s.title, task: t.text, owner: t.ownerLbl, yn: yn||'', comment: td.comment||'', photoUrl: photoUrls[0]||'', photoUrls, hasPhoto: photoUrls.length > 0 || hasLocalPhoto };
+        }
+      }));
+      return tasks;
+    })(),
+  };
+
+  pushToMasterDashboard(_fbRecord);
+  pushToFirebase(_fbRecord);
+
+  // Write days/ node for daily breakdown
+  try {
+    const _dayDate = getTodayKey().replace('dt','');
+    const _dayData = { submittedAt: new Date().toISOString() };
+    if (currentShift === 'opening') _dayData.openingPct = op;
+    else _dayData.closingPct = op;
+    if (_db) {
+      const _key = name.replace(/[^a-zA-Z0-9]/g,'_')+'_'+ROLE+'_'+outlet.replace(/[^a-zA-Z0-9]/g,'_')+'_'+weekStart.replace(/[^a-zA-Z0-9]/g,'_');
+      _db.ref('submissions/'+_key+'_'+currentShift+'/days/'+_dayDate).update(_dayData);
+    }
+  } catch(e) { console.warn('Daily score write failed:', e); }
+
+  showToast('\u2713 ' + (currentShift==='opening'?'Opening':'Closing') + ' checklist submitted!', 'ok');
+  setTimeout(() => { buildDayRail(); renderDay(); }, 100);
+}
+
+
+// ── Overwrite (Area Manager/Admin) ────────────────────────────
+function doOverwrite() {
+  const code = document.getElementById('owCode')?.value;
+  if (!checkOverwritePin(code||'')) { showToast('Wrong PIN — access denied 🔒', 'error'); return; }
+  const d = load();
+  if (d[getTodayKey()]) delete d[getTodayKey()]._done;
+  save(d);
+  showToast('Day ${currentDay} unlocked — you can now edit', 'ok');
+  buildDayRail();
+  renderDay();
+}
+
+// ── Photo ─────────────────────────────────────────────────────
+function openPhotoModal(tid, label) {
+  const data = load();
+  const dayKey = getTodayKey();
+  const openingDone = !!data[dayKey]?._openDone;
+  const closingDone = !!data[dayKey]?._closeDone;
+  const isSubmitted = currentShift === 'opening' ? openingDone : closingDone;
+  if (isSubmitted && !ALLOW_OVERWRITE) {
+    showToast('Shift submitted — cannot change photos 🔒', 'error'); return;
+  }
+  // Max 10 photos per task — count occupied slots only
+  let _photoCount = 0;
+  for (let _pi = 0; _pi < 10; _pi++) {
+    const _lk = _pi === 0 ? 'photo' : 'photo_' + _pi;
+    const _uk = _pi === 0 ? 'photoUrl' : 'photoUrl_' + _pi;
+    const _lv = getVal(currentDay, tid, _lk);
+    const _uv = getVal(currentDay, tid, _uk);
+    // Count slot as occupied only if it has a real non-empty value
+    if ((_lv && _lv !== 'null' && _lv !== '')) _photoCount++;
+  }
+  if (_photoCount >= 10) { showToast('Maximum 10 photos reached for this task', 'warn'); return; }
+  activePhotoTask = tid;
+  document.getElementById('modalLabel').textContent = label || 'Take a clear photo of this task';
+  document.getElementById('photoModal').classList.add('open');
+}
+function closePhotoModal() {
+  document.getElementById('photoModal').classList.remove('open');
+  activePhotoTask = null;
+}
+
+// mbtnCamera is now a <label for="camInput"> — no onclick needed
+// prepareCamera() is called via onclick on the label
+// mbtnGallery is now a <label for="galInput"> — no onclick needed
+// prepareGallery() is called via onclick on the label
+
+
+async function waitForPhotoUploads(tasks, maxWaitMs) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const _td = load()[getTodayKey()] || {};
+    const allDone = tasks.every(t => {
+      const hasLocal = ['photo','photo_1','photo_2','photo_3','photo_4','photo_5','photo_6','photo_7','photo_8','photo_9'].some(pk => {
+        const p = _td[t.id]?.[pk]; return p && p.startsWith('data:');
+      });
+      if (!hasLocal) return true;
+      return ['photoUrl','photoUrl_1','photoUrl_2','photoUrl_3','photoUrl_4','photoUrl_5','photoUrl_6','photoUrl_7','photoUrl_8','photoUrl_9'].some(pk => {
+        const p = _td[t.id]?.[pk]; return p && p.startsWith('http');
+      });
+    });
+    if (allDone) return;
+    await new Promise(r => setTimeout(r, 300));
+  }
+}
+
+async function _updateSubmittedPhoto(taskId, photoKey, photoUrl) {
+  if (!_db || !photoUrl || !photoUrl.startsWith('http')) return;
+  try {
+    const staffName = getStaffName ? getStaffName() : (document.getElementById('fName')?.value?.trim() || '');
+    if (!staffName) return;
+    const snap = await _db.ref('submissions').orderByChild('staffName').equalTo(staffName).limitToLast(5).once('value');
+    if (!snap.exists()) return;
+    const updates = {};
+    const matchedKeys = [];
+    snap.forEach(child => {
+      const sub = child.val();
+      if (sub.role === ROLE && sub.taskData) {
+        Object.keys(sub.taskData).forEach(k => {
+          if (k === taskId || k === 'd1_' + taskId || k.endsWith('_' + taskId)) {
+            matchedKeys.push({ fbKey: child.key, taskKey: k });
+          }
+        });
+      }
+    });
+    if (!matchedKeys.length) return;
+    // Re-read each exact taskData node fresh right before writing, to avoid
+    // overwriting a sibling photo slot that was written moments ago by a
+    // near-simultaneous upload to the same task (race condition fix).
+    for (const { fbKey, taskKey } of matchedKeys) {
+      const freshSnap = await _db.ref('submissions/' + fbKey + '/taskData/' + taskKey).once('value');
+      const existing = freshSnap.val() || {};
+      existing[photoKey] = photoUrl;
+      const allUrls = [];
+      ['photoUrl','photoUrl_1','photoUrl_2','photoUrl_3','photoUrl_4','photoUrl_5','photoUrl_6','photoUrl_7','photoUrl_8','photoUrl_9'].forEach(pk => {
+        const u = existing[pk];
+        if (u && typeof u === 'string' && u.startsWith('http') && !allUrls.includes(u)) allUrls.push(u);
+      });
+      updates['submissions/' + fbKey + '/taskData/' + taskKey + '/' + photoKey] = photoUrl;
+      if (allUrls.length > 0) updates['submissions/' + fbKey + '/taskData/' + taskKey + '/photoUrls'] = allUrls;
+    }
+    if (Object.keys(updates).length > 0) await _db.ref().update(updates);
+  } catch(e) { console.warn('_updateSubmittedPhoto failed:', e); }
+}
+
+function handlePhotoFile(file) {
+  if (!file || !activePhotoTask) return;
+  const taskId = activePhotoTask;
+  activePhotoTask = null;
+  closePhotoModal(); // ← auto-close modal immediately after photo selected
+  compressAndReturn(file, async function(dataUrl) {
+    // Support multiple photos — find next available slot
+    const data = load();
+    const dayKey = getTodayKey();
+    if (!data[dayKey]) data[dayKey] = {};
+    if (!data[dayKey][taskId]) data[dayKey][taskId] = {};
+    // Find next photo slot — check BOTH base64 (photo) and Cloudinary (photoUrl) keys
+    let slot = 'photo';
+    for (let _pi = 0; _pi < 10; _pi++) {
+      const _lk = _pi === 0 ? 'photo' : 'photo_' + _pi;
+      const _uk = _pi === 0 ? 'photoUrl' : 'photoUrl_' + _pi;
+      if (!data[dayKey][taskId][_lk] && !data[dayKey][taskId][_uk]) {
+        slot = _lk; break;
+      }
+    }
+    // Save locally first for instant display
+    setVal(currentDay, taskId, slot, dataUrl);
+    renderDay();
+    showToast('Photo saved ✓', 'ok');
+
+    // Save compressed photo to Firebase
+    const staffName = getStaffName();
+    if (staffName && _db) {
+      const dbRef = await uploadPhotoToFirebase(dataUrl, taskId, staffName, currentDay);
+      if (dbRef) {
+        setVal(currentDay, taskId, slot + '_url', dbRef);
+        showToast('Photo synced ✓', 'ok');
+        // Also save as photoUrl key for dash compatibility
+        const _oicSlotIdx = slot === 'photo' ? 0 : parseInt(slot.replace('photo_','')) || 0;
+        const _oicUrlKey = _oicSlotIdx === 0 ? 'photoUrl' : 'photoUrl_' + _oicSlotIdx;
+        setVal(currentDay, taskId, _oicUrlKey, dbRef);
+        _updateSubmittedPhoto(taskId, _oicUrlKey, dbRef);
+      }
+    }
+  });
+}
+// ── Persist info fields ───────────────────────────────────────
+function removePhoto(taskId, idx) {
+  if (!confirm('Remove this photo?')) return;
+  for (let pi = idx; pi < 9; pi++) {
+    const curKey    = pi === 0 ? 'photo'    : 'photo_'    + pi;
+    const curUrlKey = pi === 0 ? 'photoUrl' : 'photoUrl_' + pi;
+    setVal(currentDay, taskId, curKey,    getVal(currentDay, taskId, 'photo_'+(pi+1))    || '');
+    setVal(currentDay, taskId, curUrlKey, getVal(currentDay, taskId, 'photoUrl_'+(pi+1)) || '');
+  }
+  setVal(currentDay, taskId, 'photo_9',    '');
+  setVal(currentDay, taskId, 'photoUrl_9', '');
+  renderDay();
+  showToast('Photo removed ' + String.fromCharCode(10003), 'ok');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Photo listeners handled by _setupFileInput in triggerCamera/triggerGallery
+
+  // Restore currentShift from localStorage — so photo upload re-render
+  // doesn't drop back to shift picker after handlePhotoFile calls renderDay()
+  try {
+    const _savedShift = localStorage.getItem('oic_currentShift_' + getTodayKey());
+    if (_savedShift === 'opening' || _savedShift === 'closing') {
+      currentShift = _savedShift;
+    }
+  } catch(e) {}
+
+  // Auto-set Dubai date — locked, no user input
+  const _dubaiToday = getDubaiDateStr();
+  const _wf = document.getElementById('fWeek');
+  if (_wf) { if (_wf.tagName === 'INPUT') _wf.value = _dubaiToday; else _wf.textContent = _dubaiToday; }
+  localStorage.setItem('kic_info_' + ROLE + '_fWeek', _dubaiToday);
+  ['fName','fOutlet','fWeek','fVerified'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id !== 'fWeek') {
+      const saved = localStorage.getItem('kic_info_' + ROLE + '_' + id);
+      if (saved) el.value = saved;
+    }
+    el.addEventListener('input', () => {
+      if (id !== 'fWeek') localStorage.setItem('kic_info_' + ROLE + '_' + id, el.value);
+      // Update SK when name changes
+      const nameVal = document.getElementById('fName')?.value?.trim();
+      if (nameVal) SK = SK_BASE + '_' + nameVal.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+      else SK = SK_BASE;
+      // If outlet changed, clear today's data for fresh start
+      if (id === 'fOutlet') {
+        const d2 = load();
+        delete d2[getTodayKey()];
+        save(d2);
+      }
+      buildDayRail(); renderDay();
+    });
+  });
+  // Title Case on blur for name field
+  (function(){
+    const fn=document.getElementById('fName');
+    if(fn) fn.addEventListener('blur',function(){
+      if(!this.value.trim()) return;
+      this.value=this.value.trim().replace(/\w\S*/g,w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
+      localStorage.setItem('kic_info_' + ROLE + '_fName', this.value);
+    });
+  })();
+  // Set SK from saved name on load
+  const _savedName = localStorage.getItem('kic_info_' + ROLE + '_fName');
+  if (_savedName) SK = SK_BASE + '_' + _savedName.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+  // Critical: clear any stale _done from the shared SK_BASE key
+  // This prevents "already submitted" showing for new staff opening the page
+  try {
+    const _baseData = JSON.parse(localStorage.getItem(SK_BASE)||'{}');
+    const _todayKey = 'dt' + getDubaiDateStr();
+    if (_baseData[_todayKey]?._done) {
+      delete _baseData[_todayKey]._done;
+      localStorage.setItem(SK_BASE, JSON.stringify(_baseData));
+    }
+  } catch(e) {}
+
+  buildDayRail();
+  renderDay();
+  showAuditBanner();
+});
+
+// ── Midnight auto-reset (Dubai UTC+4) ───────────────────────
+function scheduleNextMidnight() {
+  const now = new Date();
+  const dubaiNow = new Date(now.getTime() + (now.getTimezoneOffset()*60000) + (4*3600000));
+  const next = new Date(dubaiNow); next.setHours(24,0,0,0);
+  setTimeout(function() {
+    const nd = getDubaiDateStr();
+    const wf = document.getElementById('fWeek');
+    if (wf) { if(wf.tagName==='INPUT') wf.value=nd; else wf.textContent=nd; }
+    localStorage.setItem('kic_info_' + ROLE + '_fWeek', nd);
+    currentShift = null; buildDayRail();
+    try { renderDay(); } catch(e) {}
+    showToast('📅 New day — ' + nd, 'ok');
+    scheduleNextMidnight();
+  }, next - dubaiNow);
+}
+scheduleNextMidnight();
+
+// Warn before page refresh if checklist not submitted
+window.addEventListener('beforeunload', function(e) {
+  const data = load();
+  const todayKey = getTodayKey();
+  const isDone = !!data[todayKey]?._done;
+  const hasAnswers = data[todayKey] && Object.keys(data[todayKey]).some(k => !k.startsWith('_'));
+  if (hasAnswers && !isDone) {
+    e.preventDefault();
+    e.returnValue = 'You have unsaved progress. Your answers are saved locally but please submit before leaving.';
+    return e.returnValue;
+  }
+});
+
+// ── Sync error banner + retry ────────────────────────────────
+function showSyncError(msg) {
+  let el = document.getElementById('syncErrorBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'syncErrorBanner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#B91C1C;color:#fff;font-size:13px;font-weight:600;padding:10px 16px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;';
+    el.innerHTML = '<span id="syncErrorMsg"></span><button onclick="retryPendingSync()" style="padding:4px 12px;background:#fff;color:#B91C1C;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Retry Now</button>';
+    document.body.prepend(el);
+  }
+  document.getElementById('syncErrorMsg').textContent = '⚠️ ' + msg;
+  el.style.display = 'flex';
+}
+function hideSyncError() {
+  const el = document.getElementById('syncErrorBanner');
+  if (el) el.style.display = 'none';
+}
+const _retryQueue = [];
+function queueRetry(record) {
+  if (!_retryQueue.find(r => r.staffName===record.staffName && r.shift===record.shift && r.week===record.week)) {
+    _retryQueue.push(record);
+  }
+  setTimeout(retryPendingSync, 30000);
+}
+function retryPendingSync() {
+  if (!_retryQueue.length) return;
+  showToast('Retrying sync (' + _retryQueue.length + ' pending)...', 'ok');
+  [..._retryQueue].forEach(record => {
+    const idx = _retryQueue.indexOf(record);
+    if (typeof pushToFirebase === 'function') pushToFirebase(record);
+    _retryQueue.splice(idx, 1);
+  });
+}
+
+function openLightbox(src) {
+  if (!src || src === '') return;
+  const lb = document.getElementById('photoLightbox');
+  const img = document.getElementById('photoLightboxImg');
+  if (!lb || !img) return;
+  img.src = src;
+  lb.style.display = 'flex';
+  _lbScale = 1; _lbX = 0; _lbY = 0;
+  img.style.transform = 'translate(0px,0px) scale(1)';
+  document.getElementById('lbZoomHint').style.opacity = '1';
+}
+function closeLightbox() {
+  const lb = document.getElementById('photoLightbox');
+  if (lb) lb.style.display = 'none';
+  _lbScale = 1; _lbX = 0; _lbY = 0;
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeLightbox();
+});
+
+
+// ── Lightbox zoom state ──────────────────────────────────────────────────────
+let _lbScale = 1, _lbX = 0, _lbY = 0;
+let _lbPinchDist = 0, _lbDragStart = null, _lbLastTap = 0;
+
+function _lbApplyTransform() {
+  const img = document.getElementById('photoLightboxImg');
+  if (img) img.style.transform = 'translate('+_lbX+'px,'+_lbY+'px) scale('+_lbScale+')';
+}
+
+function _lbClampPan() {
+  // Allow panning only when zoomed in
+  if (_lbScale <= 1) { _lbX = 0; _lbY = 0; return; }
+  const img = document.getElementById('photoLightboxImg');
+  if (!img) return;
+  const maxX = (img.offsetWidth  * (_lbScale - 1)) / 2;
+  const maxY = (img.offsetHeight * (_lbScale - 1)) / 2;
+  _lbX = Math.max(-maxX, Math.min(maxX, _lbX));
+  _lbY = Math.max(-maxY, Math.min(maxY, _lbY));
+}
+
+// Touch events
+document.addEventListener('touchstart', function(e) {
+  const lb = document.getElementById('photoLightbox');
+  if (!lb || lb.style.display === 'none') return;
+  if (e.target.id === 'photoLightboxImg' || e.target.closest('#photoLightboxWrap')) {
+    if (e.touches.length === 1) {
+      // Double-tap to zoom
+      const now = Date.now();
+      if (now - _lbLastTap < 300) {
+        e.preventDefault();
+        if (_lbScale > 1) { _lbScale = 1; _lbX = 0; _lbY = 0; }
+        else { _lbScale = 2.5; }
+        _lbApplyTransform();
+      }
+      _lbLastTap = now;
+      _lbDragStart = { x: e.touches[0].clientX - _lbX, y: e.touches[0].clientY - _lbY };
+    } else if (e.touches.length === 2) {
+      e.preventDefault();
+      _lbPinchDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  } else if (e.touches.length === 1) {
+    // Tap outside image to close
+    if (e.target === lb) closeLightbox();
+  }
+}, { passive: false });
+
+</script>
+
+<div style="margin-top:32px;padding:12px 18px;display:flex;justify-content:space-between;align-items:flex-start;border-top:1.5px solid #1A3C5E;font-family:sans-serif;">
+  <div>
+    <div style="font-size:9px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Designed &amp; Developed by</div>
+    <div style="font-size:12px;font-weight:700;color:#1A3C5E;">Sunshine Jade Rogel</div>
+    <div style="font-size:11px;color:#64748B;margin-top:1px;">June 2026</div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:9px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Department</div>
+    <div style="font-size:12px;font-weight:700;color:#1A3C5E;">Training &amp; Development</div>
+    <div style="font-size:11px;color:#64748B;margin-top:1px;">Culex Hospitality Operations</div>
+  </div>
+</div>
+
+<!-- Photo Lightbox -->
+<div id="photoLightbox" onclick="closeLightbox(event)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999;align-items:center;justify-content:center;overflow:hidden;touch-action:none;">
+  <div id="photoLightboxWrap" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+    <img id="photoLightboxImg" src="" draggable="false" style="max-width:100vw;max-height:100vh;object-fit:contain;transform-origin:center center;user-select:none;-webkit-user-select:none;">
+  </div>
+  <div style="position:absolute;top:16px;right:20px;color:#fff;font-size:36px;font-weight:300;cursor:pointer;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,0.8);z-index:10;" onclick="closeLightbox()">&times;</div>
+  <div id="lbZoomHint" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.5);font-size:12px;pointer-events:none;white-space:nowrap;">Pinch or double-tap to zoom • Tap × to close</div>
+</div>
+</body>
+</html>
