@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703090000">
+<meta name="app-version" content="20260703100000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10472,6 +10472,21 @@ function deleteVerificationEntry(btn, idx) {
 }
 
 // ── Snapshot current YN counts for a shift — stored on each verification log entry ──
+// ── Fix (2026-07-03): merge pending unsaved edits before verifying ──────
+// "Add Verification" must reflect any Yes/No/N/A taps made in Edit mode
+// that haven't been saved yet via "Save Changes" — otherwise it silently
+// verifies the OLD, already-saved answers and discards what was just
+// changed on screen, with no warning to the person doing the verification.
+function _mergeTaskDataWithEdits(taskData, editChanges) {
+  if (!editChanges || !Object.keys(editChanges).length) return taskData;
+  const merged = JSON.parse(JSON.stringify(taskData || {}));
+  Object.entries(editChanges).forEach(function([taskKey, newYn]) {
+    if (!merged[taskKey]) merged[taskKey] = {};
+    merged[taskKey].yn = newYn;
+  });
+  return merged;
+}
+
 function _snapYN(taskData, shift, role) {
   if (!taskData) return { yes: 0, no: 0, na: 0 };
   // Use all answered tasks for the shift — count everything staff answered
@@ -10608,7 +10623,7 @@ function saveBOHVerification() {
   }
   // Auto-detect re-verify: if same shift already has an entry → show confirmation dialog
   const _sameShiftExists = existingLog.some(function(e){ return e.shift === shift; });
-  const _bohYN = _snapYN(s.taskData, shift, s.role);
+  const _bohYN = _snapYN(_mergeTaskDataWithEdits(s.taskData, _editChanges), shift, s.role);
   const newEntry = { by: name, role: currentRole, at: now, shift: shift, type: _sameShiftExists ? 'reverify' : 'verify', yn_yes: _bohYN.yes, yn_no: _bohYN.no, yn_na: _bohYN.na || 0 };
   // If already verified for this shift — show confirmation dialog with 10-min wait
   if (_sameShiftExists) {
@@ -12228,7 +12243,7 @@ function saveReVerification() {
   const firebaseRef = isFOH ? fohDb : db;
   if (!firebaseRef) { showToast('Firebase not connected', 'error'); return; }
   const now = new Date().toISOString();
-  const _revYN = _snapYN(s.taskData, shift, s.role);
+  const _revYN = _snapYN(_mergeTaskDataWithEdits(s.taskData, _editChanges), shift, s.role);
   const newEntry = { by: name, role: currentRole, at: now, shift: shift, yn_yes: _revYN.yes, yn_no: _revYN.no };
   const existingLog = Array.isArray(s.verificationLog) ? [...s.verificationLog]
     : (s.verificationLog && typeof s.verificationLog === 'object') ? Object.values(s.verificationLog) : [];
@@ -12304,7 +12319,7 @@ function saveFOHMultiVerify() {
   const log = Array.isArray(rawLog) ? [...rawLog]
     : (rawLog && typeof rawLog === 'object') ? Object.values(rawLog) : [];
   const _fohSameShift = log.some(function(e){ return e.shift === fohShift; });
-  const _fohYN = _snapYN(staff.taskData, fohShift, staff.role);
+  const _fohYN = _snapYN(_mergeTaskDataWithEdits(staff.taskData, _fohEditChanges), fohShift, staff.role);
   const newEntry = { by: name, role: currentRole, at: now, shift: fohShift, type: _fohSameShift ? 'reverify' : 'verify', yn_yes: _fohYN.yes, yn_no: _fohYN.no, yn_na: _fohYN.na || 0 };
   if (staff.verifiedBy && !log.length) log.push({ by: staff.verifiedBy, role: staff.verifiedByRole||''});
   // If already verified for this shift — show confirmation dialog with 10-min wait
@@ -13000,7 +13015,7 @@ async function saveFOHOverwrite(staff) {
     if (_fohVerifiedBy) {
       const _fohShift = (document.getElementById('verifyShiftSelect')?.value) || '';
   if (!_fohShift) { showToast('Please select a checklist type first', 'warn'); return; }
-      const _fohYNSnap = _snapYN(staff.taskData, _fohShift, staff.role);
+      const _fohYNSnap = _snapYN(_mergeTaskDataWithEdits(staff.taskData, _fohEditChanges), _fohShift, staff.role);
       const _fohNewEntry = { by: _fohVerifiedBy, role: currentRole, at: new Date().toISOString(), shift: _fohShift, yn_yes: _fohYNSnap.yes, yn_no: _fohYNSnap.no };
       const _fohExistingLog = Array.isArray(sub.verificationLog) ? [...sub.verificationLog] : [];
       if (sub.verifiedBy && !_fohExistingLog.length) {
