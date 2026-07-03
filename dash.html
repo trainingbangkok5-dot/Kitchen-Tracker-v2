@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703120000">
+<meta name="app-version" content="20260703130000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10690,8 +10690,9 @@ function saveBOHVerification() {
             updateMap2['submissions/' + child.key + '/verifiedByRole'] = currentRole;
             updateMap2['submissions/' + child.key + '/verifiedAt'] = now;
             updateMap2['submissions/' + child.key + '/lastUpdated'] = now;
-            // ── Fix (2026-07-03): verifying Evaluation must also update the
-            // actual score, not just log the sign-off.
+            // ── Fix (2026-07-03): verifying ANY shift must update the actual
+            // score based on the (possibly just-edited) tally — not just log
+            // the sign-off while leaving the old percentage untouched.
             if (shift === 'evaluation') {
               if ((_bohYN.yes||0) + (_bohYN.no||0) === 0) {
                 updateMap2['submissions/' + child.key + '/evalNotVisited'] = true;
@@ -10700,6 +10701,9 @@ function saveBOHVerification() {
                 updateMap2['submissions/' + child.key + '/oicEvalPct'] = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
                 updateMap2['submissions/' + child.key + '/evalNotVisited'] = false;
               }
+            } else if ((shift === 'opening' || shift === 'closing') && ((_bohYN.yes||0) + (_bohYN.no||0)) > 0) {
+              const _bohShiftPct = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
+              updateMap2['submissions/' + child.key + '/' + shift + 'Pct'] = _bohShiftPct;
             }
           }
         });
@@ -10714,7 +10718,21 @@ function saveBOHVerification() {
                 s.oicEvalPct = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
                 s.evalNotVisited = false;
               }
+            } else if ((shift === 'opening' || shift === 'closing') && ((_bohYN.yes||0) + (_bohYN.no||0)) > 0) {
+              const _bohShiftPct2 = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
+              if (shift === 'opening') s.openingPct = _bohShiftPct2;
+              else s.closingPct = _bohShiftPct2;
             }
+            [allStaff, allBOHData, allFOHData].forEach(arr => {
+              arr.forEach(r => {
+                if (r.staffName === s.staffName && r.role === s.role && r.week === s.week) {
+                  r.evalNotVisited = s.evalNotVisited || false;
+                  r.oicEvalPct     = s.oicEvalPct != null ? s.oicEvalPct : null;
+                  r.openingPct     = s.openingPct != null ? s.openingPct : r.openingPct;
+                  r.closingPct     = s.closingPct != null ? s.closingPct : r.closingPct;
+                }
+              });
+            });
             showToast('Re-verified: ' + s.staffName, 'ok');
             renderBOHStaff();
           }).catch(e => showToast('Save failed: ' + e.message, 'error'));
@@ -10738,7 +10756,7 @@ function saveBOHVerification() {
         updateMap['submissions/' + child.key + '/verifiedBy'] = name;
         updateMap['submissions/' + child.key + '/verifiedByRole'] = currentRole;
         updateMap['submissions/' + child.key + '/verifiedAt'] = now;
-        // ── Fix (2026-07-03): same as reverify path ──────────────────────
+        // ── Fix (2026-07-03): same as reverify path — any shift, not just eval
         if (shift === 'evaluation') {
           if ((_bohYN.yes||0) + (_bohYN.no||0) === 0) {
             updateMap['submissions/' + child.key + '/evalNotVisited'] = true;
@@ -10747,6 +10765,8 @@ function saveBOHVerification() {
             updateMap['submissions/' + child.key + '/oicEvalPct'] = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
             updateMap['submissions/' + child.key + '/evalNotVisited'] = false;
           }
+        } else if ((shift === 'opening' || shift === 'closing') && ((_bohYN.yes||0) + (_bohYN.no||0)) > 0) {
+          updateMap['submissions/' + child.key + '/' + shift + 'Pct'] = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
         }
         updateMap['submissions/' + child.key + '/lastUpdated'] = now;
       }
@@ -10764,6 +10784,10 @@ function saveBOHVerification() {
           s.oicEvalPct = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
           s.evalNotVisited = false;
         }
+      } else if ((shift === 'opening' || shift === 'closing') && ((_bohYN.yes||0) + (_bohYN.no||0)) > 0) {
+        const _bohShiftPct3 = Math.round((_bohYN.yes / ((_bohYN.yes||0) + (_bohYN.no||0))) * 100);
+        if (shift === 'opening') s.openingPct = _bohShiftPct3;
+        else s.closingPct = _bohShiftPct3;
       }
       [allStaff, allBOHData, allFOHData].forEach(arr => {
         arr.forEach(r => {
@@ -10775,6 +10799,8 @@ function saveBOHVerification() {
             // Preserve evalNotVisited and oicEvalPct so N/A is not lost after verification
             r.evalNotVisited  = s.evalNotVisited || false;
             r.oicEvalPct      = s.oicEvalPct != null ? s.oicEvalPct : null;
+            r.openingPct      = s.openingPct != null ? s.openingPct : r.openingPct;
+            r.closingPct      = s.closingPct != null ? s.closingPct : r.closingPct;
           }
         });
       });
@@ -10786,6 +10812,8 @@ function saveBOHVerification() {
         _fohFiltered[_fohDetailIdx].verifiedByRole  = currentRole;
         _fohFiltered[_fohDetailIdx].evalNotVisited  = s.evalNotVisited || false;
         _fohFiltered[_fohDetailIdx].oicEvalPct      = s.oicEvalPct != null ? s.oicEvalPct : null;
+        _fohFiltered[_fohDetailIdx].openingPct      = s.openingPct != null ? s.openingPct : _fohFiltered[_fohDetailIdx].openingPct;
+        _fohFiltered[_fohDetailIdx].closingPct      = s.closingPct != null ? s.closingPct : _fohFiltered[_fohDetailIdx].closingPct;
       }
       showToast('Verified by ' + name + ' ✓', 'ok');
       // Re-render full modal so score boxes and verif history all update immediately
@@ -12356,9 +12384,9 @@ function saveFOHMultiVerify() {
             updates2['submissions/' + child.key + '/verifiedByRole'] = currentRole;
             updates2['submissions/' + child.key + '/verifiedAt'] = now;
             updates2['submissions/' + child.key + '/lastUpdated'] = now;
-            // ── Fix (2026-07-03): verifying Evaluation must also update the
-            // actual score, not just log the sign-off. Without this, the
-            // score box stayed stuck on "Pending" even after verification.
+            // ── Fix (2026-07-03): verifying ANY shift must update the actual
+            // score, not just log the sign-off — extended beyond Evaluation
+            // to Opening/Closing too.
             if (fohShift === 'evaluation') {
               if ((_fohYN.yes||0) + (_fohYN.no||0) === 0) {
                 updates2['submissions/' + child.key + '/evalNotVisited'] = true;
@@ -12368,6 +12396,8 @@ function saveFOHMultiVerify() {
                 updates2['submissions/' + child.key + '/oicEvalPct'] = _fohEvalPct;
                 updates2['submissions/' + child.key + '/evalNotVisited'] = false;
               }
+            } else if ((fohShift === 'opening' || fohShift === 'closing') && ((_fohYN.yes||0) + (_fohYN.no||0)) > 0) {
+              updates2['submissions/' + child.key + '/' + fohShift + 'Pct'] = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
             }
           }
         });
@@ -12382,7 +12412,21 @@ function saveFOHMultiVerify() {
                 staff.oicEvalPct = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
                 staff.evalNotVisited = false;
               }
+            } else if ((fohShift === 'opening' || fohShift === 'closing') && ((_fohYN.yes||0) + (_fohYN.no||0)) > 0) {
+              const _fohShiftPct = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
+              if (fohShift === 'opening') staff.openingPct = _fohShiftPct;
+              else staff.closingPct = _fohShiftPct;
             }
+            [allStaff, allFOHData].forEach(arr => {
+              arr.forEach(r => {
+                if (r.staffName === staff.staffName && r.role === staff.role && r.week === staff.week) {
+                  r.evalNotVisited = staff.evalNotVisited || false;
+                  r.oicEvalPct     = staff.oicEvalPct != null ? staff.oicEvalPct : null;
+                  r.openingPct     = staff.openingPct != null ? staff.openingPct : r.openingPct;
+                  r.closingPct     = staff.closingPct != null ? staff.closingPct : r.closingPct;
+                }
+              });
+            });
             showToast('Re-verified: ' + staff.staffName, 'ok');
             renderFOHStaff();
           }).catch(e => showToast('Save failed: ' + e.message, 'error'));
@@ -12404,8 +12448,7 @@ function saveFOHMultiVerify() {
         updates['submissions/' + child.key + '/verifiedBy'] = name;
         updates['submissions/' + child.key + '/verifiedByRole'] = currentRole;
         updates['submissions/' + child.key + '/verifiedAt'] = now;
-        // ── Fix (2026-07-03): same as reverify path — verifying Evaluation
-        // must also update the actual score, not just log the sign-off.
+        // ── Fix (2026-07-03): same as reverify path — any shift, not just eval
         if (fohShift === 'evaluation') {
           if ((_fohYN.yes||0) + (_fohYN.no||0) === 0) {
             updates['submissions/' + child.key + '/evalNotVisited'] = true;
@@ -12415,6 +12458,8 @@ function saveFOHMultiVerify() {
             updates['submissions/' + child.key + '/oicEvalPct'] = _fohEvalPct2;
             updates['submissions/' + child.key + '/evalNotVisited'] = false;
           }
+        } else if ((fohShift === 'opening' || fohShift === 'closing') && ((_fohYN.yes||0) + (_fohYN.no||0)) > 0) {
+          updates['submissions/' + child.key + '/' + fohShift + 'Pct'] = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
         }
       }
     });
@@ -12429,6 +12474,10 @@ function saveFOHMultiVerify() {
           staff.oicEvalPct = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
           staff.evalNotVisited = false;
         }
+      } else if ((fohShift === 'opening' || fohShift === 'closing') && ((_fohYN.yes||0) + (_fohYN.no||0)) > 0) {
+        const _fohShiftPct2 = Math.round((_fohYN.yes / ((_fohYN.yes||0) + (_fohYN.no||0))) * 100);
+        if (fohShift === 'opening') staff.openingPct = _fohShiftPct2;
+        else staff.closingPct = _fohShiftPct2;
       }
       allFOHData.forEach(r => {
         if (r.staffName===staff.staffName && r.role===staff.role && r.week===staff.week) {
@@ -12437,6 +12486,8 @@ function saveFOHMultiVerify() {
           r.verificationLog = log;
           r.evalNotVisited  = staff.evalNotVisited === true;
           r.oicEvalPct      = staff.oicEvalPct != null ? staff.oicEvalPct : null;
+          r.openingPct      = staff.openingPct != null ? staff.openingPct : r.openingPct;
+          r.closingPct      = staff.closingPct != null ? staff.closingPct : r.closingPct;
         }
       });
       const hEl = document.getElementById('fohVerifiedBy');
@@ -12451,6 +12502,8 @@ function saveFOHMultiVerify() {
             r.verifiedByRole  = staff.verifiedByRole;
             r.evalNotVisited  = staff.evalNotVisited === true;
             r.oicEvalPct      = staff.oicEvalPct != null ? staff.oicEvalPct : null;
+            r.openingPct      = staff.openingPct != null ? staff.openingPct : r.openingPct;
+            r.closingPct      = staff.closingPct != null ? staff.closingPct : r.closingPct;
           }
         });
       });
