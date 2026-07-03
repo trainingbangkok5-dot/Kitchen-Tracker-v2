@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703140000">
+<meta name="app-version" content="20260703150000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -9096,12 +9096,26 @@ function toggleEditMode(s) {
       (['linecook','steward'].includes(s.role) && ['kic','areachef','areamanager','director','training','operations','ceo'].includes(currentRole)) ||
       (['service','bartender','delco'].includes(s.role) && ['oic','areamanager','director','training','operations','ceo'].includes(currentRole))
     );
-    // Always start blank — verifier must consciously select checklist type
-    _owShiftSel.value = '';
-    // Hide all task sections until selection made
-    _applyOverwriteShiftFilter('');
+    // ── Fix (2026-07-03): preserve an existing selection instead of force-
+    // resetting to blank every time edit mode is entered. This was the
+    // repeated cause of "task list not showing" — the dropdown looked
+    // selected, but silently got wiped back to blank on every edit-mode
+    // entry, requiring the person to reselect even when they'd already
+    // chosen a shift moments earlier (e.g. via the Verification panel).
+    const _existingShiftVal = _owShiftSel.value || '';
+    _applyOverwriteShiftFilter(_existingShiftVal);
     const _newOwSel = _owShiftSel.cloneNode(true);
+    _newOwSel.value = _existingShiftVal;
     _owShiftSel.parentNode.replaceChild(_newOwSel, _owShiftSel);
+    if (_existingShiftVal) {
+      const _saveBtn0 = document.querySelector('.edit-report-btn');
+      if (_saveBtn0) {
+        _saveBtn0.disabled = false;
+        _saveBtn0.style.background = '#16A34A';
+        _saveBtn0.style.cursor = 'pointer';
+        _saveBtn0.style.opacity = '1';
+      }
+    }
     _newOwSel.addEventListener('change', function() {
       const val = this.value;
       _applyOverwriteShiftFilter(val);
@@ -12995,12 +13009,32 @@ function toggleFOHEditMode() {
   // ── Wire shift dropdown to show/hide FOH eval sections ──────────────────
   const _fohShiftSel = document.getElementById('verifyShiftSelect');
   if (_fohShiftSel) {
-    // Always start blank — verifier must consciously select checklist type
-    _fohShiftSel.value = '';
-    _applyFOHShiftFilter('');
+    // ── Fix (2026-07-03): preserve existing selection instead of blanking —
+    // matches the same fix applied on the BOH side.
+    const _fohExistingVal = _fohShiftSel.value || '';
+    _applyFOHShiftFilter(_fohExistingVal);
     // Remove any previous listener to avoid stacking
     const _newSel = _fohShiftSel.cloneNode(true);
+    _newSel.value = _fohExistingVal;
     _fohShiftSel.parentNode.replaceChild(_newSel, _fohShiftSel);
+    if (_fohExistingVal) {
+      const _fohArea0 = document.getElementById('fohChecklistArea');
+      if (_fohArea0) _fohArea0.style.display = '';
+      const _saveBtn0 = document.getElementById('fohEditBtn');
+      if (_saveBtn0) {
+        _saveBtn0.disabled = false;
+        _saveBtn0.style.background = '#16A34A';
+        _saveBtn0.style.cursor = 'pointer';
+        _saveBtn0.style.opacity = '1';
+      }
+      const _verifBtn0 = document.getElementById('addVerifBtn');
+      if (_verifBtn0) {
+        _verifBtn0.disabled = false;
+        _verifBtn0.style.background = '#15803D';
+        _verifBtn0.style.cursor = 'pointer';
+        _verifBtn0.style.opacity = '1';
+      }
+    }
     _newSel.addEventListener('change', function() {
       const val = this.value;
       if (val) {
