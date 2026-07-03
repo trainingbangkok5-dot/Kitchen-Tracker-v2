@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703110000">
+<meta name="app-version" content="20260703120000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7153,7 +7153,17 @@ function deleteRecord(fbKey, staffName, week) {
     }
     if (!foundKey) { alert('Record not found. May already be deleted.'); return; }
     db.ref('submissions/' + foundKey).remove()
-      .then(function() { showDeleteToast(staffName + ' — ' + week + ' deleted'); })
+      .then(function() {
+        // ── Fix (2026-07-03): refresh UI after delete — was silently
+        // succeeding in Firebase but leaving the modal/list unchanged,
+        // making it look like the delete didn't work.
+        allStaff = allStaff.filter(function(s) { return !(s.staffName === staffName && s.week === week); });
+        allBOHData = allBOHData.filter(function(s) { return !(s.staffName === staffName && s.week === week); });
+        showDeleteToast(staffName + ' — ' + week + ' deleted');
+        const _dm = document.getElementById('detailModal');
+        if (_dm) _dm.classList.remove('open');
+        renderBOHStaff();
+      })
       .catch(function(e) { alert('Delete failed: ' + e.message); });
   });
 }
@@ -11232,21 +11242,9 @@ function renderBOHStaff() {
   const avg = filtered.length ? Math.round(filtered.reduce((a,s)=>a+s.overallPct,0)/filtered.length) : 0;
   document.getElementById('bohStatAvg').textContent = filtered.length ? avg+'%' : '—';
 
-  // AC alert — show only to areachef/director/training/operations/ceo
+  // AC alert — removed per request (2026-07-03), banner no longer shown
   const bohAlertEl = document.getElementById('bohACAlert');
-  const bohAlertTextEl = document.getElementById('bohACAlertText');
-  if (bohAlertEl && bohAlertTextEl && ['areachef','director','training','operations','ceo'].includes(currentRole)) {
-    const pendingKICs = filtered.filter(s => s.role === 'kic' && (s.oicEvalPct == null || s.oicEvalPct === undefined));
-    if (pendingKICs.length > 0) {
-      const names = pendingKICs.map(s => `<strong>${s.staffName}</strong> (${s.outlet})`).join(', ');
-      bohAlertTextEl.innerHTML = `${pendingKICs.length} KIC record${pendingKICs.length > 1 ? 's' : ''} still need your evaluation this week: ${names}.`;
-      bohAlertEl.style.display = 'block';
-    } else {
-      bohAlertEl.style.display = 'none';
-    }
-  } else if (bohAlertEl) {
-    bohAlertEl.style.display = 'none';
-  }
+  if (bohAlertEl) bohAlertEl.style.display = 'none';
   const tbody = document.getElementById('bohTableBody');
   tbody.innerHTML = '';
   document.getElementById('bohEmpty').style.display = filtered.length ? 'none' : 'block';
@@ -11517,21 +11515,9 @@ function renderFOHStaff() {
   const avg = filtered.length ? Math.round(filtered.reduce((a,s)=>a+s.overallPct,0)/filtered.length) : 0;
   document.getElementById('fohStatAvg').textContent = filtered.length ? avg + '%' : '—';
 
-  // AM alert — show only to areamanager/director/training/operations/ceo
+  // AM alert — removed per request (2026-07-03), banner no longer shown
   const alertEl = document.getElementById('fohAMAlert');
-  const alertTextEl = document.getElementById('fohAMAlertText');
-  if (alertEl && alertTextEl && ['areamanager','director','training','operations','ceo'].includes(currentRole)) {
-    const pendingOICs = filtered.filter(s => s.role === 'oic' && (s.oicEvalPct == null || s.oicEvalPct === undefined));
-    if (pendingOICs.length > 0) {
-      const names = pendingOICs.map(s => `<strong>${s.staffName}</strong> (${s.outlet})`).join(', ');
-      alertTextEl.innerHTML = `${pendingOICs.length} OIC record${pendingOICs.length > 1 ? 's' : ''} still need your evaluation this week: ${names}.`;
-      alertEl.style.display = 'block';
-    } else {
-      alertEl.style.display = 'none';
-    }
-  } else if (alertEl) {
-    alertEl.style.display = 'none';
-  }
+  if (alertEl) alertEl.style.display = 'none';
 
   const tbody = document.getElementById('fohTableBody');
   tbody.innerHTML = '';
