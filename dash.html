@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260703100000">
+<meta name="app-version" content="20260703110000">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5464,6 +5464,18 @@ function _buildVerifierTag(vlog, taskData, shiftKey, role) {
 
 
 function openStaffDetail(s) {
+  // ── Fix (2026-07-03): protect an active edit session from being wiped ──
+  // If the person is actively in Edit/Overwrite mode with unsaved changes
+  // or a shift already selected, a background live-data refresh calling
+  // this function would silently rebuild the whole modal — resetting the
+  // shift dropdown to blank and hiding the task list, even though nothing
+  // the person did was wrong. Legitimate paths (Cancel, Save) already set
+  // _editMode = false themselves before calling this, so they pass through
+  // safely; only an unwanted background re-render gets blocked here.
+  if (_editMode) {
+    console.warn('openStaffDetail: skipped re-render — edit mode is active');
+    return;
+  }
   // Always open in view mode
   _editMode = false;
   _editChanges = {};
